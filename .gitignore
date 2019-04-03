@@ -1,5 +1,9 @@
 /.gradle/
 /.settings/
+/bin/
 /build/
 /dist/
 *.class
+.antProperties.xml
+.classpath
+.project
