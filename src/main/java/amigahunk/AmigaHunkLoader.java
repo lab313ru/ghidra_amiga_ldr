@@ -29,7 +29,9 @@ import ghidra.app.util.importer.MessageLog;
 import ghidra.app.util.opinion.AbstractLibrarySupportLoader;
 import ghidra.app.util.opinion.LoadSpec;
 import ghidra.framework.model.DomainObject;
+import ghidra.framework.store.LockException;
 import ghidra.program.flatapi.FlatProgramAPI;
+import ghidra.program.model.address.AddressOverflowException;
 import ghidra.program.model.lang.LanguageCompilerSpecPair;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.MemoryBlock;
@@ -46,6 +48,7 @@ import hunk.SegmentType;
 public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 
 	static final String AMIGA_HUNK = "Amiga Executable Hunks loader";
+	static final int DEF_IMAGE_BASE = 0x21F000;
 	
 	@Override
 	public String getName() {
@@ -72,18 +75,18 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 		BinaryReader reader = new BinaryReader(provider, false);
 		BinImage bi = BinFmtHunk.loadImage(reader, log);
 		
+		if (bi == null) {
+			return;
+		}
+		
 		Relocate rel = new Relocate(bi);
-		long[] addrs = rel.getSeqAddresses(0x21F000);
+		long[] addrs = rel.getSeqAddresses(DEF_IMAGE_BASE);
 		List<byte[]> datas = rel.relocate(addrs);
 		
 		FlatProgramAPI fpa = new FlatProgramAPI(program);
 		fpa.addEntryPoint(fpa.toAddr(addrs[0]));
 		
 		RelocationTable relocTable = program.getRelocationTable();
-
-		if (bi == null) {
-			return;
-		}
 
 		for (Segment seg : bi.getSegments()) {
 			long offset = addrs[seg.getId()];
@@ -114,6 +117,12 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 			boolean exec = seg.getType() == SegmentType.SEGMENT_TYPE_CODE;
 			
 			createSegment(fpa, segBytes, String.format("SEG_%02d", seg.getId()), offset, size, exec, log);
+		}
+		
+		try {
+			program.setImageBase(fpa.toAddr(DEF_IMAGE_BASE), true);
+		} catch (AddressOverflowException | LockException | IllegalStateException e) {
+			log.appendException(e);
 		}
 	}
 	

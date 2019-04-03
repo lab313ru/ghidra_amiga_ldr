@@ -20,31 +20,27 @@ import ghidra.app.services.AnalyzerType;
 import ghidra.app.util.importer.MessageLog;
 import ghidra.framework.options.Options;
 import ghidra.program.model.address.AddressSetView;
-import ghidra.program.model.lang.Processor;
 import ghidra.program.model.listing.Program;
 import ghidra.util.task.TaskMonitor;
 
 public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 	
-	private static boolean isMotorola(Program program) {
-		Processor proc = program.getLanguage().getProcessor();
-		return proc.equals(Processor.toProcessor("68000")) || proc.equals(Processor.toProcessor("68020")) ||
-				proc.equals(Processor.toProcessor("68030")) || proc.equals(Processor.toProcessor("68040"));
+	public static boolean isAmigaHunkLoader(Program program) {
+		return program.getExecutableFormat().equalsIgnoreCase(AmigaHunkLoader.AMIGA_HUNK);
 	}
 
 	public AmigaHunkAnalyzer() {
-
 		super("Amiga library calls", "Analyses calls to system libraries", AnalyzerType.FUNCTION_ANALYZER);
 	}
 
 	@Override
 	public boolean getDefaultEnablement(Program program) {
-		return isMotorola(program);
+		return isAmigaHunkLoader(program);
 	}
 
 	@Override
 	public boolean canAnalyze(Program program) {
-		return program.getExecutableFormat().equalsIgnoreCase("Amiga Hunk");
+		return isAmigaHunkLoader(program);
 	}
 
 	@Override

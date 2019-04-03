@@ -42,7 +42,7 @@ class HunkLoadSegFile {
 			if (block.getHunkType() == HunkType.HUNK_END) {
 				current = null;
 			} else {
-				if (!block.isValidLoadsegBeginHunk() && block.isValidLoadsegExtraHunk()) {
+				if (!(block.isValidLoadsegBeginHunk() || block.isValidLoadsegExtraHunk())) {
 					throw new HunkParseError(String.format("Invalid block found: %d", block.getHunkType().getValue()));
 				}
 				
