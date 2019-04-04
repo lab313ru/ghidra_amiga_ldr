@@ -23,7 +23,7 @@ class HunkDebugBlock extends HunkBlock {
 	}
 	
 	public byte[] getData() {
-		return debugData.clone();
+		return debugData;
 	}
 
 }

@@ -15,7 +15,7 @@ public class Segment {
 	Segment(SegmentType type, int size, byte[] data) {
 		this.type = type;
 		this.segSize = size;
-		this.data = data.clone();
+		this.data = data;
 		fileData = null;
 		
 		relocsList = new HashMap<>();

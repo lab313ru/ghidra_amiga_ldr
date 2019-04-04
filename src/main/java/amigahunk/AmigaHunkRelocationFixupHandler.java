@@ -7,7 +7,7 @@ import ghidra.program.model.mem.MemoryAccessException;
 import ghidra.program.model.reloc.Relocation;
 import ghidra.program.model.util.CodeUnitInsertionException;
 
-public class AmigaRelocationFixupHandler extends RelocationFixupHandler {
+public class AmigaHunkRelocationFixupHandler extends RelocationFixupHandler {
 
 	@Override
 	public boolean processRelocation(Program program, Relocation relocation, Address oldImageBase, Address newImageBase)

@@ -10,6 +10,6 @@ public enum SegmentType {
 
     @Override
 	public String toString() {
-		return name();
+		return name().substring("SEGMENT_TYPE_".length());
 	}
 }

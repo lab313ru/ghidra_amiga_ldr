@@ -9,7 +9,11 @@ public class Relocate {
 	private final BinImage binImage;
 	
 	public Relocate(BinImage binImage) {
-		this.binImage = binImage;
+		if (binImage == null) {
+			this.binImage = new BinImage();
+		} else {
+			this.binImage = binImage;
+		}
 	}
 	
 	private int[] getSizes() {

@@ -8,7 +8,7 @@ public class Reloc {
 	
 	Reloc(int offset) {
 		this.offset = offset;
-		this.width = 2;
+		this.width = 4;
 		this.addend = 0;
 	}
 

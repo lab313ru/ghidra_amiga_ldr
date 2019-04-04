@@ -33,7 +33,7 @@ class HunkSegmentBlock extends HunkBlock {
 	}
 	
 	byte[] getData() {
-		return this.data.clone();
+		return this.data;
 	}
 
     int getSizeLongs() {

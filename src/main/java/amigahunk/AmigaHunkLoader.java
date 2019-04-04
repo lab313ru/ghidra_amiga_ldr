@@ -29,11 +29,16 @@ import ghidra.app.util.importer.MessageLog;
 import ghidra.app.util.opinion.AbstractLibrarySupportLoader;
 import ghidra.app.util.opinion.LoadSpec;
 import ghidra.framework.model.DomainObject;
+import ghidra.framework.store.LockException;
 import ghidra.program.flatapi.FlatProgramAPI;
+import ghidra.program.model.address.Address;
+import ghidra.program.model.address.AddressOverflowException;
 import ghidra.program.model.lang.LanguageCompilerSpecPair;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.MemoryBlock;
 import ghidra.program.model.reloc.RelocationTable;
+import ghidra.program.model.symbol.SourceType;
+import ghidra.util.exception.InvalidInputException;
 import ghidra.util.task.TaskMonitor;
 import hunk.BinFmtHunk;
 import hunk.BinImage;
@@ -78,16 +83,16 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 		}
 		
 		Relocate rel = new Relocate(bi);
-		long[] addrs = rel.getSeqAddresses(DEF_IMAGE_BASE);
+		long[] addrs = rel.getSeqAddresses(0);
 		List<byte[]> datas = rel.relocate(addrs);
 		
 		FlatProgramAPI fpa = new FlatProgramAPI(program);
-		fpa.addEntryPoint(fpa.toAddr(addrs[0]));
+		setFunction(program, fpa, fpa.toAddr(addrs[0]), "start", log);
 		
 		RelocationTable relocTable = program.getRelocationTable();
 
 		for (Segment seg : bi.getSegments()) {
-			long offset = addrs[seg.getId()];
+			long segOffset = addrs[seg.getId()];
 			int size = seg.getSize();
 			
 			Segment[] toSegs = seg.getRelocationsToSegments();
@@ -96,34 +101,49 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 				Relocations reloc = seg.getRelocations(toSeg);
 				
 				for (Reloc r : reloc.getRelocations()) {
-					int offset2 = r.getOffset();
+					int dataOffset = r.getOffset();
 					
 					ByteBuffer buf = ByteBuffer.wrap(datas.get(seg.getId()));
-					int relOff = buf.getInt(offset2);
+					long newAddr = segOffset + buf.getInt(dataOffset) + r.getAddend();
 					
-					long addr = offset + relOff + r.getAddend();
-					
-					byte[] oldBytes = reader.readByteArray(addr, r.getWidth());
 					long[] values = new long[1];
-					values[0] = offset + offset2;
-					relocTable.add(fpa.toAddr(addr), r.getWidth(), values, oldBytes, null);
+					values[0] = newAddr;
+					relocTable.add(fpa.toAddr(segOffset + dataOffset), r.getWidth(), values, null, null);
 				}
 			}
 			
 			ByteArrayInputStream segBytes = new ByteArrayInputStream(datas.get(seg.getId()));
 			
 			boolean exec = seg.getType() == SegmentType.SEGMENT_TYPE_CODE;
+			boolean write = seg.getType() == SegmentType.SEGMENT_TYPE_DATA;
 			
-			createSegment(fpa, segBytes, String.format("SEG_%02d", seg.getId()), offset, size, exec, log);
+			createSegment(fpa, segBytes, String.format("%s_%02d", seg.getType().toString(), seg.getId()), segOffset, size, write, exec, log);
+		}
+		
+		try {
+			program.setImageBase(fpa.toAddr(DEF_IMAGE_BASE), true);
+		} catch (AddressOverflowException | LockException | IllegalStateException e) {
+			log.appendException(e);
 		}
 	}
 	
-	private void createSegment(FlatProgramAPI fpa, InputStream stream, String name, long address, long size, boolean execute, MessageLog log) {
+	private static void setFunction(Program program, FlatProgramAPI fpa, Address address, String name, MessageLog log) {
+		try {
+			fpa.disassemble(address);
+			fpa.createFunction(address, name);
+			fpa.addEntryPoint(address);
+			program.getSymbolTable().createLabel(address, name, SourceType.IMPORTED);
+		} catch (InvalidInputException e) {
+			log.appendException(e);
+		}
+	}
+	
+	private void createSegment(FlatProgramAPI fpa, InputStream stream, String name, long address, long size, boolean write, boolean execute, MessageLog log) {
 		MemoryBlock block;
 		try {
 			block = fpa.createMemoryBlock(name, fpa.toAddr(address), stream, size, false);
 			block.setRead(true);
-			block.setWrite(false);
+			block.setWrite(write);
 			block.setExecute(execute);
 		} catch (Exception e) {
 			log.appendException(e);
