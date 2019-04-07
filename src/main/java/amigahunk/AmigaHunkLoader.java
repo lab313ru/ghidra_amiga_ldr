@@ -29,10 +29,8 @@ import ghidra.app.util.importer.MessageLog;
 import ghidra.app.util.opinion.AbstractLibrarySupportLoader;
 import ghidra.app.util.opinion.LoadSpec;
 import ghidra.framework.model.DomainObject;
-import ghidra.framework.store.LockException;
 import ghidra.program.flatapi.FlatProgramAPI;
 import ghidra.program.model.address.Address;
-import ghidra.program.model.address.AddressOverflowException;
 import ghidra.program.model.lang.LanguageCompilerSpecPair;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.MemoryBlock;
@@ -120,11 +118,11 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 			createSegment(fpa, segBytes, String.format("%s_%02d", seg.getType().toString(), seg.getId()), segOffset, size, write, exec, log);
 		}
 		
-		try {
-			program.setImageBase(fpa.toAddr(DEF_IMAGE_BASE), true);
-		} catch (AddressOverflowException | LockException | IllegalStateException e) {
-			log.appendException(e);
-		}
+//		try {
+//			program.setImageBase(fpa.toAddr(DEF_IMAGE_BASE), true);
+//		} catch (AddressOverflowException | LockException | IllegalStateException e) {
+//			log.appendException(e);
+//		}
 	}
 	
 	private static void setFunction(Program program, FlatProgramAPI fpa, Address address, String name, MessageLog log) {

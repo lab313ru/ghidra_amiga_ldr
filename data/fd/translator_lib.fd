@@ -1,0 +1,6 @@
+* "translator.library"
+##base _TranslatorBase
+##bias 30
+##public
+Translate(inputString,inputLength,outputBuffer,bufferSize)(a0,d0/a1,d1)
+##end

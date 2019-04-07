@@ -1,0 +1,28 @@
+* "datatypes.library"
+##base _DataTypesBase
+##bias 30
+##public
+*--- functions in V39 or higher (beta release for developers only) ---
+*
+RLDispatch(rmsg,result)(a0/a1)
+ObtainDataTypeA(type,handle,attrs)(d0/a0/a1)
+ReleaseDataType(dt)(a0)
+NewDTObjectA(name,attrs)(d0/a0)
+DisposeDTObject(o)(a0)
+SetDTAttrsA(o,win,req,attrs)(a0/a1/a2/a3)
+GetDTAttrsA(o,attrs)(a0/a2)
+AddDTObject(win,req,o,pos)(a0/a1/a2,d0)
+RefreshDTObjectA(o,win,req,attrs)(a0/a1/a2/a3)
+DoAsyncLayout(o,gpl)(a0/a1)
+DoDTMethodA(o,win,req,msg)(a0/a1/a2/a3)
+RemoveDTObject(win,o)(a0/a1)
+GetDTMethods(object)(a0)
+GetDTTriggerMethods(object)(a0)
+PrintDTObjectA(o,w,r,msg)(a0/a1/a2/a3)
+##private
+datatypesPrivate1()()
+datatypesPrivate2()()
+datatypesPrivate3()()
+##public
+GetDTString(id)(d0)
+##end

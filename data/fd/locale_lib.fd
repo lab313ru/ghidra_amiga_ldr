@@ -1,0 +1,51 @@
+* "locale.library"
+##base _LocaleBase
+##bias 30
+##public
+*--- functions in V38 or higher (distributed as Release 2.1) ---
+##private
+* ARexx function host entry point
+* This function also returns a (struct RexxMsg *) in A1
+localePrivate1()()
+##public
+*
+* Public entries
+*
+CloseCatalog(catalog)(a0)
+CloseLocale(locale)(a0)
+ConvToLower(locale,character)(a0,d0)
+ConvToUpper(locale,character)(a0,d0)
+FormatDate(locale,template,date,putCharFunc)(a0/a1/a2/a3)
+FormatString(locale,string,dataStream,putCharFunc)(a0/a1/a2/a3)
+GetCatalogStr(catalog,stringNum,defaultString)(a0,d0/a1)
+GetLocaleStr(locale,stringNum)(a0,d0)
+IsAlNum(locale,character)(a0,d0)
+IsAlpha(locale,character)(a0,d0)
+IsCntrl(locale,character)(a0,d0)
+IsDigit(locale,character)(a0,d0)
+IsGraph(locale,character)(a0,d0)
+IsLower(locale,character)(a0,d0)
+IsPrint(locale,character)(a0,d0)
+IsPunct(locale,character)(a0,d0)
+IsSpace(locale,character)(a0,d0)
+IsUpper(locale,character)(a0,d0)
+IsXDigit(locale,character)(a0,d0)
+OpenCatalogA(locale,name,tags)(a0/a1/a2)
+OpenLocale(name)(a0)
+ParseDate(locale,date,template,getCharFunc)(a0/a1/a2/a3)
+##private
+localePrivate2()()
+##public
+StrConvert(locale,string,buffer,bufferSize,type)(a0/a1/a2,d0/d1)
+StrnCmp(locale,string1,string2,length,type)(a0/a1/a2,d0/d1)
+##private
+*
+* Reserved entries
+*
+localePrivate3()()
+localePrivate4()()
+localePrivate5()()
+localePrivate6()()
+localePrivate7()()
+localePrivate8()()
+##end

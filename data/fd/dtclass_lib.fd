@@ -1,0 +1,8 @@
+* "dtclass.class"
+##base _DTClassBase
+##bias 30
+##public
+*--- functions in V39 or higher (distributed as Release 3.0) ---
+*
+ObtainEngine()()
+##end
