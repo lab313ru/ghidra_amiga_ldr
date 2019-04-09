@@ -1,6 +1,7 @@
 package hunk;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 import ghidra.app.util.bin.BinaryReader;
 
@@ -24,9 +25,10 @@ class HunkDebug {
 					HunkBlock.readName(reader);
 					return new HunkDebugLine();
 				case "HEAD":
-					String tag2 = reader.readNextAsciiString(4);
+					byte[] dbgmagic = { 'D', 'B', 'G', 'V', '0', '1', 0, 0 };
+					byte[] tag2 = reader.readNextByteArray(8);
 
-					if (!tag2.equals("DBGV01\u0000\u0000")) {
+					if (!Arrays.equals(dbgmagic, tag2)) {
 						throw new HunkParseError("Wrong debug tag (!= DBGV01\\x00\\x00)");
 					}
 
