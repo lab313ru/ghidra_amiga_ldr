@@ -15,33 +15,21 @@
  */
 package amigahunk;
 
-import java.io.IOException;
-import java.math.BigInteger;
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.List;
 
 import ghidra.app.plugin.core.analysis.ConstantPropagationContextEvaluator;
 import ghidra.app.services.AbstractAnalyzer;
 import ghidra.app.services.AnalyzerType;
-import ghidra.app.util.bin.BinaryReader;
-import ghidra.app.util.bin.ByteProvider;
-import ghidra.app.util.bin.MemoryByteProvider;
 import ghidra.app.util.importer.MessageLog;
 import ghidra.framework.options.Options;
-import ghidra.program.flatapi.FlatProgramAPI;
 import ghidra.program.model.address.Address;
-import ghidra.program.model.address.AddressSet;
 import ghidra.program.model.address.AddressSetView;
-import ghidra.program.model.address.AddressSpace;
 import ghidra.program.model.lang.Register;
-import ghidra.program.model.lang.RegisterValue;
 import ghidra.program.model.listing.CodeUnit;
 import ghidra.program.model.listing.Instruction;
-import ghidra.program.model.listing.InstructionIterator;
 import ghidra.program.model.listing.Program;
-import ghidra.program.model.mem.Memory;
 import ghidra.program.model.scalar.Scalar;
-import ghidra.program.model.symbol.RefType;
-import ghidra.program.model.symbol.SourceType;
 import ghidra.program.util.SymbolicPropogator;
 import ghidra.program.util.VarnodeContext;
 import ghidra.util.exception.CancelledException;
@@ -49,7 +37,8 @@ import ghidra.util.task.TaskMonitor;
 
 public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 	
-	private FdLibraryList libsList;
+	private final List<String> filter = new ArrayList<String>();
+	private FdFunctionsList funcsList;
 	
 	public static boolean isAmigaHunkLoader(Program program) {
 		return program.getExecutableFormat().equalsIgnoreCase(AmigaHunkLoader.AMIGA_HUNK);
@@ -57,6 +46,9 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 
 	public AmigaHunkAnalyzer() {
 		super("Amiga Library Calls", "Analyses calls to system libraries", AnalyzerType.INSTRUCTION_ANALYZER);
+		
+		filter.add("exec_lib.fd");
+		filter.add("dos_lib.fd");
 	}
 
 	@Override
@@ -67,60 +59,71 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 	@Override
 	public boolean canAnalyze(Program program) {
 		if (isAmigaHunkLoader(program)) {
-			libsList = new FdLibraryList();
+			funcsList = new FdFunctionsList();
 			return true;
 		}
 		
-		libsList = null;
+		funcsList = null;
 		return false;
 	}
-
+	
 	@Override
 	public void registerOptions(Options options, Program program) {
 		
-		options.registerOption("Option name goes here", false, null,
-			"Option description goes here");
+		if (funcsList == null) {
+			return;
+		}
+		
+		String[] libsList = funcsList.getLibsList();
+		for (String lib : libsList) {
+			boolean val = (filter != null) ? filter.contains(lib) : true;
+			options.registerOption(lib.replace("_lib.fd", "").toUpperCase(), val, null, String.format("Analyze calls from %s", lib));
+		}
+	}
+	
+	@Override
+	public void optionsChanged(Options options, Program program) {
+		super.optionsChanged(options, program);
+		
+		if (funcsList == null) {
+			return;
+		}
+		
+		filter.clear();
+		
+		String[] libsList = funcsList.getLibsList();
+		for (String lib : libsList) {
+			if (!options.getBoolean(lib.replace("_lib.fd", "").toUpperCase(), true)) {
+				filter.remove(lib);
+			} else {
+				filter.add(lib);
+			}
+		}
 	}
 
 	@Override
 	public boolean added(Program program, AddressSetView set, TaskMonitor monitor, MessageLog log) {
 		
-		FlatProgramAPI fpa = new FlatProgramAPI(program);
-		System.out.println(set.contains(fpa.toAddr(0x0E)));
 		SymbolicPropogator symEval = new SymbolicPropogator(program);
 		symEval.setParamRefCheck(false);
 		symEval.setReturnRefCheck(false);
 		symEval.setStoredRefCheck(false);
 		
-		long totalNumAddresses = set.getNumAddresses();
-		monitor.initialize(totalNumAddresses);
+		monitor.setMessage("Analysing library calls...");
 
 		try {
-			InstructionIterator iterator = program.getListing().getInstructions(set, true);
-			while (iterator.hasNext()) {
-				Instruction instr = iterator.next();
-				Address start = instr.getMinAddress();
-				AddressSetView resultSet = flowConstants(program, start, set, symEval, monitor);
-				if (resultSet != null) {
-					if (!start.equals(set.getMinAddress())) {
-						set = set.subtract(new AddressSet(set.getMinAddress(), start));
-					}
-					set = set.subtract(resultSet);
-				}
-			}
+			flowConstants(program, set.getMinAddress(), set, symEval, monitor);
 		} catch (CancelledException e) {
 
 		}
 
-		return false;
+		return true;
 	}
 	
 	public AddressSetView flowConstants(final Program program, Address flowStart,
 			AddressSetView flowSet, final SymbolicPropogator symEval, final TaskMonitor monitor)
 			throws CancelledException {
 
-		// follow all flows building up context
-		// use context to fill out addresses on certain instructions
 		ConstantPropagationContextEvaluator eval =
 			new ConstantPropagationContextEvaluator(true) {
 				@Override
@@ -134,58 +137,24 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 						if (reg != null && reg.getName().equals("A6") &&
 							objs.length != 0 && (objs[0] instanceof Address) &&
 							((Address)objs[0]).getOffset() == 4) {
-							context.setValue(reg, BigInteger.valueOf(libsList.getLibraryIndex(FdLibraryList.EXEC)));
-						}
-					} else if (mnemonic.equals("lea")) {
-						Register destReg = instr.getRegister(1);
-						if (destReg == null) {
-							return false;
-						}
-						RegisterValue value = context.getRegisterValue(destReg);
-						if (value != null) {
-							BigInteger rval = value.getUnsignedValue();
-							long lval = rval.longValue();
-							Address refAddr = instr.getMinAddress().getNewAddress(lval);
-							if ((lval > 4096 || lval < 0) &&
-								program.getMemory().contains(refAddr) ||
-								Arrays.asList(instr.getOpObjects(0)).contains(
-									program.getRegister("PC"))) {
-								Memory memory = program.getMemory();
-								AddressSpace space = program.getAddressFactory().getDefaultAddressSpace();
-								ByteProvider provider = new MemoryByteProvider(memory, space);
-								BinaryReader reader = new BinaryReader(provider, false);
-								try {
-									String libName = reader.readAsciiString(refAddr.getOffset()).replace(".library", "_lib.fd");
-									context.setValue(context.getRegister("A6"), BigInteger.valueOf(libsList.getLibraryIndex(libName)));
-								} catch (IOException e) {
-									
-								}
-							}
+							program.getListing().setComment(instr.getAddress(), CodeUnit.PRE_COMMENT, "EXEC.library Base offset");
 						}
 					} else if (mnemonic.equals("jsr")) {
 						Object[] objs = instr.getOpObjects(0);
 						Register reg = instr.getRegister(1);
 						if (reg != null && reg.getName().equals("A6") &&
 								objs.length != 0 && (objs[0] instanceof Scalar)) {
-							String libName = libsList.getLibraryByIndex(context.getValue(reg, false).intValue());
-							FdFunctionTable fd = FdParser.readFdFile(libName);
+							FdFunction[] funcs = funcsList.getFunctionsByBias(filter, (int)((Scalar)objs[0]).getSignedValue());
 							
-							if (fd == null) {
-								return false;
+							StringBuilder sb = new StringBuilder();
+							
+							for (FdFunction func : funcs) {
+								sb.append(func.getName());
+								sb.append(func.getArgsStr(true));
+								sb.append(System.getProperty("line.separator"));
 							}
-							
-							FdFunction func = fd.getFuncByBias((int)((Scalar)objs[0]).getSignedValue());
-							
-							if (func == null) {
-								return false;
-							}
-							
-							if (func.getName().equals("OpenLibrary")) {
-								RegisterValue val = context.getRegisterValue(context.getRegister("A0"));
-								System.out.print(val);
-							}
-							
-							program.getListing().setComment(instr.getAddress(), CodeUnit.EOL_COMMENT, func.getArgsStr(true));
+
+							program.getListing().setComment(instr.getAddress(), CodeUnit.PRE_COMMENT, sb.toString().strip());
 						}
 					}
 					return false;

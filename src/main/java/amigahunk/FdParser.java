@@ -78,7 +78,7 @@ public class FdParser {
 					
 					String name = m.group(1);
 					
-					FdFunction func = new FdFunction(name, bias, privat);
+					FdFunction func = new FdFunction(f.getName().toLowerCase(), name, bias, privat);
 					
 					if (func != null) {
 						funcTable.addFunction(func);

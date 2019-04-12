@@ -5,6 +5,7 @@ import java.util.stream.Collectors;
 
 public class FdFunction {
 	
+	private final String lib;
 	private final String name;
 	private final int bias;
 	private final boolean privat;
@@ -12,13 +13,18 @@ public class FdFunction {
 	
 	private HashMap<String, String> args;
 	
-	FdFunction(String name, int bias, boolean privat) {
+	public FdFunction(String lib, String name, int bias, boolean privat) {
+		this.lib = lib;
 		this.name = name;
 		this.bias = bias;
 		this.index = (bias - 6) / 6;
 		this.privat = privat;
 		
 		args = new HashMap<String, String>();
+	}
+	
+	public final String getLib() {
+		return lib;
 	}
 
 	public final String getName() {
