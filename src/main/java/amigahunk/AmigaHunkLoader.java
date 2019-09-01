@@ -202,7 +202,18 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 					long it_DataInit = mem.getInt(rt_InitAddr.add(8));
 					long it_InitFunc = mem.getInt(rt_InitAddr.add(12));
 					
-					setFunction(program, fpa, fpa.toAddr(it_InitFunc), String.format("it_InitFunc_%06X", addr.getOffset()), log);
+					Address it_InitFuncAddr = fpa.toAddr(it_InitFunc);
+					setFunction(program, fpa, it_InitFuncAddr, String.format("it_InitFunc_%06X", addr.getOffset()), log);
+					Function func = fpa.getFunctionAt(it_InitFuncAddr);
+					func.setCustomVariableStorage(true);
+					
+					List<ParameterImpl> params = new ArrayList<>();
+					
+					params.add(new ParameterImpl("base", PointerDataType.dataType, program.getRegister("A6"), program));
+					params.add(new ParameterImpl("seglist", PointerDataType.dataType, program.getRegister("A0"), program));
+					params.add(new ParameterImpl("lib", PointerDataType.dataType, program.getRegister("D0"), program));
+					
+					func.updateFunction(null, null, FunctionUpdateType.CUSTOM_STORAGE, true, SourceType.ANALYSIS, params.toArray(ParameterImpl[]::new));
 					
 					Address it_DataInitAddr = fpa.toAddr(it_DataInit);
 					program.getSymbolTable().createLabel(it_DataInitAddr, String.format("it_DataInit_%06X", addr.getOffset()), SourceType.ANALYSIS);
@@ -254,10 +265,10 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 							}
 							
 							setFunction(program, fpa, funcAddr_, name, log);
-							Function func = fpa.getFunctionAt(funcAddr_);
+							func = fpa.getFunctionAt(funcAddr_);
 							func.setCustomVariableStorage(true);
 							
-							List<ParameterImpl> params = new ArrayList<>();
+							params = new ArrayList<>();
 							
 							params.add(new ParameterImpl("base", PointerDataType.dataType, program.getRegister("A6"), program));
 							
