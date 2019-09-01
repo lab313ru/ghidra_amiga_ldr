@@ -3,6 +3,9 @@ package amigahunk;
 import java.util.HashMap;
 import java.util.stream.Collectors;
 
+import ghidra.program.model.lang.Register;
+import ghidra.program.model.listing.Program;
+
 public class FdFunction {
 	
 	private final String lib;
@@ -27,8 +30,8 @@ public class FdFunction {
 		return lib;
 	}
 
-	public final String getName() {
-		return name;
+	public final String getName(boolean withLib) {
+		return (withLib ? lib.replace("_lib.fd", ".library") + "->" : "") + name;
 	}
 
 	public final int getBias() {
@@ -70,6 +73,15 @@ public class FdFunction {
 			
 			sb.append(" )");
 			return sb.toString();
+		}
+	}
+	
+	public Register[] getArgRegs(Program program) {
+		if (args.size() == 0) {
+			return new Register[] {};
+		} else {
+			return args.entrySet().stream()
+					.map(e -> new Register(program.getRegister(e.getValue()))).toArray(Register[]::new);
 		}
 	}
 }

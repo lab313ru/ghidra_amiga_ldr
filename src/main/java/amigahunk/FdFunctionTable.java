@@ -6,7 +6,7 @@ import java.util.List;
 
 public class FdFunctionTable {
 
-	List<FdFunction> funcs;
+	private List<FdFunction> funcs;
 	private final String lib;
 	private HashMap<Integer, FdFunction> biasMap;
 	private HashMap<String, FdFunction> nameMap;
@@ -25,23 +25,31 @@ public class FdFunctionTable {
 		return lib;
 	}
 	
-	public FdFunction[] getFuncs() {
+	public FdFunction getFunctionByIndex(int index) {
+		return (index >= 0 && index < funcs.size()) ? funcs.get(index) : null;
+	}
+	
+	public FdFunction[] getFunctions() {
 		return funcs.toArray(FdFunction[]::new);
 	}
 	
-	public FdFunction getFuncByBias(int bias) {
+	public Integer[] getBiases() {
+		return biasMap.keySet().toArray(Integer[]::new);
+	}
+	
+	public FdFunction getFunctionByBias(int bias) {
 		return biasMap.getOrDefault(bias, null);
 	}
 	
-	public String[] getAllFuncNames() {
+	public String[] getFunctionNames() {
 		return nameMap.keySet().toArray(String[]::new);
 	}
 	
-	public boolean hasFunc(String name) {
+	public boolean hasFunction(String name) {
 		return nameMap.containsKey(name);
 	}
 	
-	public FdFunction getFuncByName(String name) {
+	public FdFunction getFunctionByName(String name) {
 		return nameMap.getOrDefault(name, null);
 	}
 	
@@ -56,7 +64,7 @@ public class FdFunctionTable {
 		
 		biasMap.put(bias, f);
 		
-		String name = f.getName();
+		String name = f.getName(false);
 		nameMap.put(name, f);
 		
 		while (indexTab.size() < (Math.abs(bias) / 6)) {

@@ -22,13 +22,18 @@ import ghidra.app.plugin.core.analysis.ConstantPropagationContextEvaluator;
 import ghidra.app.services.AbstractAnalyzer;
 import ghidra.app.services.AnalyzerType;
 import ghidra.app.util.importer.MessageLog;
+import ghidra.feature.vt.gui.util.VTMatchApplyChoices.CallingConventionChoices;
 import ghidra.framework.options.Options;
+import ghidra.program.flatapi.FlatProgramAPI;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressSetView;
 import ghidra.program.model.lang.Register;
 import ghidra.program.model.listing.CodeUnit;
+import ghidra.program.model.listing.Function;
+import ghidra.program.model.listing.FunctionIterator;
 import ghidra.program.model.listing.Instruction;
 import ghidra.program.model.listing.Program;
+import ghidra.program.model.pcode.FunctionPrototype;
 import ghidra.program.model.scalar.Scalar;
 import ghidra.program.util.SymbolicPropogator;
 import ghidra.program.util.VarnodeContext;
@@ -38,7 +43,7 @@ import ghidra.util.task.TaskMonitor;
 public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 	
 	private final List<String> filter = new ArrayList<String>();
-	private FdFunctionsList funcsList;
+	private FdFunctionList funcsList;
 	
 	public static boolean isAmigaHunkLoader(Program program) {
 		return program.getExecutableFormat().equalsIgnoreCase(AmigaHunkLoader.AMIGA_HUNK);
@@ -59,7 +64,7 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 	@Override
 	public boolean canAnalyze(Program program) {
 		if (isAmigaHunkLoader(program)) {
-			funcsList = new FdFunctionsList();
+			funcsList = new FdFunctionList();
 			return true;
 		}
 		
@@ -103,18 +108,27 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 
 	@Override
 	public boolean added(Program program, AddressSetView set, TaskMonitor monitor, MessageLog log) {
-		
-		SymbolicPropogator symEval = new SymbolicPropogator(program);
-		symEval.setParamRefCheck(false);
-		symEval.setReturnRefCheck(false);
-		symEval.setStoredRefCheck(false);
-		
 		monitor.setMessage("Analysing library calls...");
+		
+		FunctionIterator fiter = program.getFunctionManager().getFunctions(set, true);
+		while (fiter.hasNext()) {
+			if (monitor.isCancelled()) {
+				break;
+			}
 
-		try {
-			flowConstants(program, set.getMinAddress(), set, symEval, monitor);
-		} catch (CancelledException e) {
+			Function func = fiter.next();
+			Address start = func.getEntryPoint();
+			
+			SymbolicPropogator symEval = new SymbolicPropogator(program);
+			symEval.setParamRefCheck(true);
+			symEval.setReturnRefCheck(true);
+			symEval.setStoredRefCheck(true);
 
+			try {
+				flowConstants(program, start, func.getBody(), symEval,  monitor);
+			} catch (CancelledException e) {
+				log.appendException(e);
+			}
 		}
 
 		return true;
@@ -130,26 +144,17 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 				public boolean evaluateContext(VarnodeContext context, Instruction instr) {
 					String mnemonic = instr.getMnemonicString();
 
-					if (mnemonic.equals("movea.l")) {
-						Object[] objs = instr.getOpObjects(0);
-						Register reg = instr.getRegister(1);
-						
-						if (reg != null && reg.getName().equals("A6") &&
-							objs.length != 0 && (objs[0] instanceof Address) &&
-							((Address)objs[0]).getOffset() == 4) {
-							program.getListing().setComment(instr.getAddress(), CodeUnit.PRE_COMMENT, "EXEC.library Base offset");
-						}
-					} else if (mnemonic.equals("jsr")) {
+					if (mnemonic.equals("jsr")) {
 						Object[] objs = instr.getOpObjects(0);
 						Register reg = instr.getRegister(1);
 						if (reg != null && reg.getName().equals("A6") &&
 								objs.length != 0 && (objs[0] instanceof Scalar)) {
-							FdFunction[] funcs = funcsList.getFunctionsByBias(filter, (int)((Scalar)objs[0]).getSignedValue());
+							FdFunction[] funcs = funcsList.getLibsFunctionsByBias(filter, (int)((Scalar)objs[0]).getSignedValue());
 							
 							StringBuilder sb = new StringBuilder();
 							
 							for (FdFunction func : funcs) {
-								sb.append(func.getName());
+								sb.append(func.getName(true));
 								sb.append(func.getArgsStr(true));
 								sb.append(System.getProperty("line.separator"));
 							}

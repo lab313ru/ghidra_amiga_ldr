@@ -15,13 +15,18 @@ public class FdParser {
 
 	public static FdFunctionTable readFdFile(String libName) {
 		try {
-			File f = new File("fd", libName);
-			File libFile = Application.getModuleDataFile(f.getPath()).getFile(false);
-			if (!libFile.exists()) {
-				return null;
+			File f = new File(libName);
+			
+			if (!f.exists()) {
+				f = new File("fd", libName);
+				f = Application.getModuleDataFile(f.getPath()).getFile(false);
+				
+				if (!f.exists()) {
+					return null;
+				}
 			}
-		
-			return readFd(libFile);
+
+			return readFd(f);
 		} catch (Exception e) {
 			return null;
 		}
