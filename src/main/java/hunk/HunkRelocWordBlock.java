@@ -8,8 +8,8 @@ import ghidra.app.util.bin.BinaryReader;
 
 class HunkRelocWordBlock extends HunkRelocBlock {
 
-	HunkRelocWordBlock() {
-		super(HunkType.HUNK_RELOC32SHORT);
+	HunkRelocWordBlock(HunkType type) {
+		super(type);
 	}
 	
 	@Override

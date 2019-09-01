@@ -31,10 +31,6 @@ abstract class HunkBlock implements IHunkBlock {
 		return new String(bytes);
 	}
 	
-	void setReloc32ShortType() {
-		blkId = HunkType.HUNK_RELOC32SHORT;
-	}
-	
 	HunkType getHunkType() {
 		return blkId;
 	}
@@ -54,6 +50,7 @@ abstract class HunkBlock implements IHunkBlock {
 	boolean isValidLoadsegExtraHunk() {
 		switch (blkId) {
 		case HUNK_ABSRELOC32:
+		case HUNK_DREL32:
 		case HUNK_RELOC32SHORT:
 		case HUNK_DEBUG:
 		case HUNK_SYMBOL:
@@ -80,12 +77,12 @@ abstract class HunkBlock implements IHunkBlock {
 		case HUNK_ABSRELOC32:
 		case HUNK_RELRELOC16:
 		case HUNK_RELRELOC8:
-		case HUNK_DREL32:
 		case HUNK_DREL16:
 		case HUNK_DREL8:
-			return new HunkRelocLongBlock();
+			return new HunkRelocLongBlock((HunkType)type);
 		case HUNK_RELOC32SHORT:
-			return new HunkRelocWordBlock();
+		case HUNK_DREL32:
+			return new HunkRelocWordBlock((HunkType)type);
 		case HUNK_END:
 			return new HunkEndBlock();
 		case HUNK_DEBUG:

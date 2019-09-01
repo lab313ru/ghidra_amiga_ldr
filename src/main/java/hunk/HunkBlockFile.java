@@ -28,10 +28,6 @@ class HunkBlockFile {
 					throw new HunkParseError(String.format("Unsupported hunk type: %04d", tag & HunkType.HUNK_TYPE_MASK));
 				}
 				
-				if (block.getHunkType() == HunkType.HUNK_DREL32) {
-					block.setReloc32ShortType();
-				}
-				
 				block.parse(reader);
 				blocksList.add(block);
 			}

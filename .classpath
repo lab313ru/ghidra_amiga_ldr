@@ -410,11 +410,6 @@
 			<attribute name="javadoc_location" value="jar:file:/D:\ghidra_9.0.4\docs\GhidraAPI_javadoc.zip!/api/"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry kind="lib" path="D:/ghidra_9.0.4/Ghidra/Extensions/ghidra_amiga_ldr/lib/ghidra_amiga_ldr.jar" sourcepath="D:/ghidra_9.0.4/Ghidra/Extensions/ghidra_amiga_ldr/lib/ghidra_amiga_ldr-src.zip">
-		<attributes>
-			<attribute name="javadoc_location" value="jar:file:/D:\ghidra_9.0.4\docs\GhidraAPI_javadoc.zip!/api/"/>
-		</attributes>
-	</classpathentry>
 	<classpathentry kind="lib" path="D:/ghidra_9.0.4/Ghidra/Extensions/ghidra_psx_ldr/lib/ghidra_psx_ldr.jar">
 		<attributes>
 			<attribute name="javadoc_location" value="jar:file:/D:\ghidra_9.0.4\docs\GhidraAPI_javadoc.zip!/api/"/>

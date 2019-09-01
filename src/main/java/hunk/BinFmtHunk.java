@@ -75,7 +75,9 @@ public final class BinFmtHunk {
 	
 	private static void addHunkRelocs(HunkRelocBlock[] relocBlocks, Segment seg, Segment[] allSegs) throws HunkParseError {
 		for (HunkRelocBlock blk : relocBlocks) {
-			if (blk.getHunkType() != HunkType.HUNK_ABSRELOC32 && blk.getHunkType() != HunkType.HUNK_RELOC32SHORT) {
+			if (blk.getHunkType() != HunkType.HUNK_ABSRELOC32 &&
+					blk.getHunkType() != HunkType.HUNK_RELOC32SHORT &&
+					blk.getHunkType() != HunkType.HUNK_DREL32) {
 				throw new HunkParseError(String.format("Invalid Relocations for BinImage: %d", blk.getHunkType().getValue()));
 			}
 			

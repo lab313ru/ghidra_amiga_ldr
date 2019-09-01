@@ -72,7 +72,9 @@ class HunkSegment {
 					
 					dbgInfos.add(info);
 				}
-			} else if (block.getHunkType() == HunkType.HUNK_ABSRELOC32 || block.getHunkType() == HunkType.HUNK_RELOC32SHORT) {
+			} else if (block.getHunkType() == HunkType.HUNK_ABSRELOC32 ||
+					block.getHunkType() == HunkType.HUNK_DREL32 ||
+					block.getHunkType() == HunkType.HUNK_RELOC32SHORT) {
 				if (relocBlocks == null) {
 					relocBlocks = new ArrayList<>();
 				}

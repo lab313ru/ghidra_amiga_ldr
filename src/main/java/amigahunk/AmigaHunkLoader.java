@@ -73,13 +73,13 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 
 	static final String AMIGA_HUNK = "Amiga Executable Hunks loader";
 	static final int DEF_IMAGE_BASE = 0x21F000;
-	
+
 	static final String OPTION_NAME = "ImageBase";
 	Address imageBase = null;
-	
-	static final byte[] RTC_MATCHWORD = new byte[] {0x4A, (byte)0xFC};
-	static final byte RTF_AUTOINIT = (byte)(1 << 7);
-	
+
+	static final byte[] RTC_MATCHWORD = new byte[] { 0x4A, (byte) 0xFC };
+	static final byte RTF_AUTOINIT = (byte) (1 << 7);
+
 	@Override
 	public String getName() {
 
@@ -98,22 +98,22 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 	}
 
 	@Override
-	protected void load(ByteProvider provider, LoadSpec loadSpec, List<Option> options,
-			Program program, MemoryConflictHandler handler, TaskMonitor monitor, MessageLog log)
-			throws IOException {
-		
+	protected void load(ByteProvider provider, LoadSpec loadSpec, List<Option> options, Program program,
+			MemoryConflictHandler handler, TaskMonitor monitor, MessageLog log) throws IOException {
+
 		FlatProgramAPI fpa = new FlatProgramAPI(program);
 		Memory mem = program.getMemory();
 
 		BinaryReader reader = new BinaryReader(provider, false);
 		BinImage bi = BinFmtHunk.loadImage(reader, log);
-		
+
 		if (bi == null) {
 			return;
 		}
-		
+
 		Relocate rel = new Relocate(bi);
-		long[] addrs = rel.getSeqAddresses((imageBase != null) ? imageBase.getOffset() : fpa.toAddr(DEF_IMAGE_BASE).getOffset());
+		long[] addrs = rel
+				.getSeqAddresses((imageBase != null) ? imageBase.getOffset() : fpa.toAddr(DEF_IMAGE_BASE).getOffset());
 		List<byte[]> datas = rel.relocate(addrs);
 
 		Address startAddr = fpa.toAddr(addrs[0]);
@@ -122,164 +122,189 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 		for (Segment seg : bi.getSegments()) {
 			long segOffset = addrs[seg.getId()];
 			int size = seg.getSize();
-			
-			
+
 			ByteArrayInputStream segBytes = new ByteArrayInputStream(datas.get(seg.getId()));
-			
+
 			if (segBytes.available() == 0) {
 				continue;
 			}
-			
+
 			boolean exec = seg.getType() == SegmentType.SEGMENT_TYPE_CODE;
 			boolean write = seg.getType() == SegmentType.SEGMENT_TYPE_DATA;
-			
-			createSegment(segBytes, fpa, String.format("%s_%02d", seg.getType().toString(), seg.getId()), segOffset, size, write, exec, log);
-			
+
+			createSegment(segBytes, fpa, String.format("%s_%02d", seg.getType().toString(), seg.getId()), segOffset,
+					size, write, exec, log);
+
 			Segment[] toSegs = seg.getRelocationsToSegments();
-			
+
 			for (Segment toSeg : toSegs) {
 				Relocations reloc = seg.getRelocations(toSeg);
-				
+
 				for (Reloc r : reloc.getRelocations()) {
 					int dataOffset = r.getOffset();
-					
+
 					ByteBuffer buf = ByteBuffer.wrap(datas.get(seg.getId()));
 					long newAddr = buf.getInt(dataOffset) + r.getAddend();
-					
+
 					try {
-						mem.setBytes(fpa.toAddr(segOffset + dataOffset), intToBytes((int)newAddr));
+						mem.setBytes(fpa.toAddr(segOffset + dataOffset), intToBytes((int) newAddr));
 					} catch (MemoryAccessException e) {
 						log.appendException(e);
 					}
 				}
 			}
 		}
-		
+
 		FdFunctionList funcsList = new FdFunctionList();
-		
+
 		createBaseSegment(fpa, funcsList, log);
-		
+
 		analyzeResident(mem, fpa, startAddr, log);
 	}
-	
+
 	private static byte[] intToBytes(int x) {
-	    ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES);
-	    buffer.order(ByteOrder.BIG_ENDIAN);
-	    buffer.putInt(x);
-	    return buffer.array();
+		ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES);
+		buffer.order(ByteOrder.BIG_ENDIAN);
+		buffer.putInt(x);
+		return buffer.array();
 	}
-	
+
 	private void analyzeResident(Memory mem, FlatProgramAPI fpa, Address startAddr, MessageLog log) {
 		Program program = fpa.getCurrentProgram();
-		
+
 		try {
 			while (true) {
 				Address addr = fpa.find(startAddr, RTC_MATCHWORD);
-				
+
 				if (addr == null) {
 					break;
 				}
-				
+
 				long rt_MatchTag = mem.getInt(addr.add(2));
-				
+
 				startAddr = addr.add(2);
 				if (addr.getOffset() != rt_MatchTag) {
 					continue;
 				}
-				
-				DataUtilities.createData(program, addr, (new Resident()).toDataType(), -1, false, ClearDataMode.CLEAR_ALL_UNDEFINED_CONFLICT_DATA);
-				
+
+				DataUtilities.createData(program, addr, (new Resident()).toDataType(), -1, false,
+						ClearDataMode.CLEAR_ALL_UNDEFINED_CONFLICT_DATA);
+
 				byte rt_Flags = mem.getByte(addr.add(10));
-				
+
 				if ((rt_Flags & RTF_AUTOINIT) == RTF_AUTOINIT) {
 					long rt_Init = mem.getInt(addr.add(22));
 					Address rt_InitAddr = fpa.toAddr(rt_Init);
-					
-					DataUtilities.createData(program, rt_InitAddr, (new InitTable()).toDataType(), -1, false, ClearDataMode.CLEAR_ALL_UNDEFINED_CONFLICT_DATA);
-					
-					/*long it_DataSize = */mem.getInt(rt_InitAddr.add(0));
+
+					DataUtilities.createData(program, rt_InitAddr, (new InitTable()).toDataType(), -1, false,
+							ClearDataMode.CLEAR_ALL_UNDEFINED_CONFLICT_DATA);
+
+					/* long it_DataSize = */mem.getInt(rt_InitAddr.add(0));
 					long it_FuncTable = mem.getInt(rt_InitAddr.add(4));
 					long it_DataInit = mem.getInt(rt_InitAddr.add(8));
 					long it_InitFunc = mem.getInt(rt_InitAddr.add(12));
-					
+
 					Address it_InitFuncAddr = fpa.toAddr(it_InitFunc);
-					setFunction(program, fpa, it_InitFuncAddr, String.format("it_InitFunc_%06X", addr.getOffset()), log);
+					setFunction(program, fpa, it_InitFuncAddr, String.format("it_InitFunc_%06X", addr.getOffset()),
+							log);
 					Function func = fpa.getFunctionAt(it_InitFuncAddr);
 					func.setCustomVariableStorage(true);
-					
+
 					List<ParameterImpl> params = new ArrayList<>();
-					
+
 					params.add(new ParameterImpl("base", PointerDataType.dataType, program.getRegister("A6"), program));
-					params.add(new ParameterImpl("seglist", PointerDataType.dataType, program.getRegister("A0"), program));
+					params.add(
+							new ParameterImpl("seglist", PointerDataType.dataType, program.getRegister("A0"), program));
 					params.add(new ParameterImpl("lib", PointerDataType.dataType, program.getRegister("D0"), program));
-					
-					func.updateFunction(null, null, FunctionUpdateType.CUSTOM_STORAGE, true, SourceType.ANALYSIS, params.toArray(ParameterImpl[]::new));
-					
-					Address it_DataInitAddr = fpa.toAddr(it_DataInit);
-					program.getSymbolTable().createLabel(it_DataInitAddr, String.format("it_DataInit_%06X", addr.getOffset()), SourceType.ANALYSIS);
-					Address it_FuncTableAddr = fpa.toAddr(it_FuncTable);
-					program.getSymbolTable().createLabel(it_FuncTableAddr, String.format("it_FuncTable_%06X", addr.getOffset()), SourceType.ANALYSIS);
-					
-					while (true) {
-						InitData_Type tt;
-						try {
-							tt = new InitData_Type(mem, fpa, it_DataInitAddr.getOffset());
-						} catch (Exception e) {
-							break;
+
+					func.updateFunction(null, null, FunctionUpdateType.CUSTOM_STORAGE, true, SourceType.ANALYSIS,
+							params.toArray(ParameterImpl[]::new));
+
+					if (it_DataInit != 0) {
+						Address it_DataInitAddr = fpa.toAddr(it_DataInit);
+						program.getSymbolTable().createLabel(it_DataInitAddr,
+								String.format("it_DataInit_%06X", addr.getOffset()), SourceType.ANALYSIS);
+
+						while (true) {
+							InitData_Type tt;
+							try {
+								tt = new InitData_Type(mem, fpa, it_DataInitAddr.getOffset());
+							} catch (Exception e) {
+								break;
+							}
+							DataUtilities.createData(program, it_DataInitAddr, tt.toDataType(), -1, false,
+									ClearDataMode.CLEAR_ALL_UNDEFINED_CONFLICT_DATA);
+							it_DataInitAddr = it_DataInitAddr.add(tt.toDataType().getLength());
 						}
-						DataUtilities.createData(program, it_DataInitAddr, tt.toDataType(), -1, false, ClearDataMode.CLEAR_ALL_UNDEFINED_CONFLICT_DATA);
-						it_DataInitAddr = it_DataInitAddr.add(tt.toDataType().getLength());
 					}
-					
+					Address it_FuncTableAddr = fpa.toAddr(it_FuncTable);
+					program.getSymbolTable().createLabel(it_FuncTableAddr,
+							String.format("it_FuncTable_%06X", addr.getOffset()), SourceType.ANALYSIS);
+
 					int i = 0;
 					boolean askedForFd = false;
 					FdFunctionTable funcTable = null;
-					
+
 					while (true) {
 						long funcAddr = mem.getInt(it_FuncTableAddr.add(i * 4));
 
 						Address funcAddr_ = fpa.toAddr(funcAddr);
 						if (mem.contains(funcAddr_)) {
-							if (!askedForFd && i >= 4 && OptionDialog.YES_OPTION == OptionDialog.showYesNoDialogWithNoAsDefaultButton(null, "Question",
-									"Do you have *_lib.fd file for this library?")) {
-								String fdPath = showSelectFile("Select file...");
-								funcTable = FdParser.readFdFile(fdPath);
+							if (!askedForFd && i >= 4) {
+								if (OptionDialog.YES_OPTION == OptionDialog.showYesNoDialogWithNoAsDefaultButton(null,
+										"Question", "Do you have *_lib.fd file for this library?")) {
+									String fdPath = showSelectFile("Select file...");
+									funcTable = FdParser.readFdFile(fdPath);
+								}
 								askedForFd = true;
 							}
-							
-							DataUtilities.createData(program, it_FuncTableAddr.add(i * 4), PointerDataType.dataType, -1, false, ClearDataMode.CLEAR_ALL_UNDEFINED_CONFLICT_DATA);
-							
+
+							DataUtilities.createData(program, it_FuncTableAddr.add(i * 4), PointerDataType.dataType, -1,
+									false, ClearDataMode.CLEAR_ALL_UNDEFINED_CONFLICT_DATA);
+
 							FdFunction funcDef = null;
 							if (funcTable != null) {
-								 funcDef = funcTable.getFunctionByIndex(i - 4);
+								funcDef = funcTable.getFunctionByIndex(i - 4);
 							}
-							
+
 							String name;
-							
+
 							switch (i) {
-							case 0: name = "LIB_OPEN"; break;
-							case 1: name = "LIB_CLOSE"; break;
-							case 2: name = "LIB_EXPUNGE"; break;
-							case 3: name = "LIB_EXTFUNC"; break;
-							default: name = funcDef != null ? funcDef.getName(false) : String.format("LibFunc_%03d", i - 4);
+							case 0:
+								name = "LIB_OPEN";
+								break;
+							case 1:
+								name = "LIB_CLOSE";
+								break;
+							case 2:
+								name = "LIB_EXPUNGE";
+								break;
+							case 3:
+								name = "LIB_EXTFUNC";
+								break;
+							default:
+								name = funcDef != null ? funcDef.getName(false) : String.format("LibFunc_%03d", i - 4);
 							}
-							
+
 							setFunction(program, fpa, funcAddr_, name, log);
 							func = fpa.getFunctionAt(funcAddr_);
 							func.setCustomVariableStorage(true);
-							
+
 							params = new ArrayList<>();
-							
-							params.add(new ParameterImpl("base", PointerDataType.dataType, program.getRegister("A6"), program));
-							
+
+							params.add(new ParameterImpl("base", PointerDataType.dataType, program.getRegister("A6"),
+									program));
+
 							if (funcDef != null) {
 								HashMap<String, String> args = funcDef.getArgs();
 								for (Entry<String, String> arg : args.entrySet()) {
-									params.add(new ParameterImpl(arg.getKey(), DWordDataType.dataType, program.getRegister(arg.getValue()), program));
+									params.add(new ParameterImpl(arg.getKey(), DWordDataType.dataType,
+											program.getRegister(arg.getValue()), program));
 								}
 							}
-							
-							func.updateFunction(null, null, FunctionUpdateType.CUSTOM_STORAGE, true, SourceType.ANALYSIS, params.toArray(ParameterImpl[]::new));
+
+							func.updateFunction(null, null, FunctionUpdateType.CUSTOM_STORAGE, true,
+									SourceType.ANALYSIS, params.toArray(ParameterImpl[]::new));
 							i++;
 						} else {
 							break;
@@ -287,42 +312,44 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 					}
 				}
 			}
-		} catch (InvalidInputException | MemoryAccessException | AddressOutOfBoundsException | CodeUnitInsertionException | DuplicateNameException | IOException e) {
+		} catch (InvalidInputException | MemoryAccessException | AddressOutOfBoundsException
+				| CodeUnitInsertionException | DuplicateNameException | IOException e) {
 			log.appendException(e);
 		}
 	}
-	
+
 	private static String showSelectFile(String title) {
-        JFileChooser jfc = new JFileChooser(new File("."));
-        jfc.setDialogTitle(title);
+		JFileChooser jfc = new JFileChooser(new File("."));
+		jfc.setDialogTitle(title);
 
-        jfc.setFileFilter(new FileNameExtensionFilter("Functions Definition File", "fd"));
-        jfc.setMultiSelectionEnabled(false);
+		jfc.setFileFilter(new FileNameExtensionFilter("Functions Definition File", "fd"));
+		jfc.setMultiSelectionEnabled(false);
 
-        if (jfc.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-            return jfc.getSelectedFile().getAbsolutePath();
-        }
+		if (jfc.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+			return jfc.getSelectedFile().getAbsolutePath();
+		}
 
-        return null;
-    }
-	
+		return null;
+	}
+
 	private static void createBaseSegment(FlatProgramAPI fpa, FdFunctionList funcsList, MessageLog log) {
 		MemoryBlock exec = createSegment(null, fpa, "EXEC", 0x4, 4, true, false, log);
-		
+
 		FdFunctionTable tbl = funcsList.getFunctionTableByLib("exec_lib.fd");
 		AmigaLibrary lib = new AmigaLibrary("Exec", tbl, fpa.getCurrentProgram(), log);
 
 		try {
 			Program program = fpa.getCurrentProgram();
 			DataType dt = lib.toDataType();
-			
-			DataUtilities.createData(program, exec.getStart(), new PointerDataType(dt), -1, false, ClearDataMode.CLEAR_ALL_UNDEFINED_CONFLICT_DATA);
-			
+
+			DataUtilities.createData(program, exec.getStart(), new PointerDataType(dt), -1, false,
+					ClearDataMode.CLEAR_ALL_UNDEFINED_CONFLICT_DATA);
+
 		} catch (DuplicateNameException | IOException | CodeUnitInsertionException e) {
 			log.appendException(e);
 		}
 	}
-	
+
 	private static void setFunction(Program program, FlatProgramAPI fpa, Address address, String name, MessageLog log) {
 		try {
 			fpa.disassemble(address);
@@ -333,8 +360,9 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 			log.appendException(e);
 		}
 	}
-	
-	private static MemoryBlock createSegment(InputStream stream, FlatProgramAPI fpa, String name, long address, long size, boolean write, boolean execute, MessageLog log) {
+
+	private static MemoryBlock createSegment(InputStream stream, FlatProgramAPI fpa, String name, long address,
+			long size, boolean write, boolean execute, MessageLog log) {
 		MemoryBlock block;
 		try {
 			block = fpa.createMemoryBlock(name, fpa.toAddr(address), stream, size, false);
@@ -349,40 +377,39 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 	}
 
 	@Override
-	public List<Option> getDefaultOptions(ByteProvider provider, LoadSpec loadSpec,
-			DomainObject domainObject, boolean isLoadIntoProgram) {
-		List<Option> list =	new ArrayList<Option>();
-		
+	public List<Option> getDefaultOptions(ByteProvider provider, LoadSpec loadSpec, DomainObject domainObject,
+			boolean isLoadIntoProgram) {
+		List<Option> list = new ArrayList<Option>();
+
 		LanguageCompilerSpecPair pair = loadSpec.getLanguageCompilerSpec();
 		try {
 			Language importerLanguage = getLanguageService().getLanguage(pair.languageID);
 			imageBase = importerLanguage.getAddressFactory().getDefaultAddressSpace().getAddress(DEF_IMAGE_BASE);
 			list.add(new Option(OPTION_NAME, imageBase, Address.class, Loader.COMMAND_LINE_ARG_PREFIX + "-baseAddr"));
 		} catch (LanguageNotFoundException e) {
-			
+
 		}
 
 		return list;
 	}
 
-    @Override
+	@Override
 	public String validateOptions(ByteProvider provider, LoadSpec loadSpec, List<Option> options) {
 
-    	imageBase = null;
-    	
-    	for (Option option : options) {
+		imageBase = null;
+
+		for (Option option : options) {
 			String optName = option.getName();
 			try {
 				if (optName.equals(OPTION_NAME)) {
 					imageBase = (Address) option.getValue();
-					
+
 					long val = imageBase.getOffset();
 					if (val >= 0x1000L && val <= 0x700000L) {
 						break;
 					}
 				}
-			}
-			catch (Exception e) {
+			} catch (Exception e) {
 				if (e instanceof OptionException) {
 					return e.getMessage();
 				}
