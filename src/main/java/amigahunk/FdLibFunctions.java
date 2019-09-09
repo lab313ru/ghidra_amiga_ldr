@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-public class FdFunctionTable {
+public class FdLibFunctions {
 
 	private List<FdFunction> funcs;
 	private final String lib;
@@ -12,7 +12,7 @@ public class FdFunctionTable {
 	private HashMap<String, FdFunction> nameMap;
 	private List<FdFunction> indexTab;
 	
-	FdFunctionTable(String lib) {
+	FdLibFunctions(String lib) {
 		funcs = new ArrayList<FdFunction>();
 		
 		this.lib = lib;

@@ -32,7 +32,6 @@ import ghidra.app.util.Option;
 import ghidra.app.util.OptionException;
 import ghidra.app.util.bin.BinaryReader;
 import ghidra.app.util.bin.ByteProvider;
-import ghidra.app.util.importer.MemoryConflictHandler;
 import ghidra.app.util.importer.MessageLog;
 import ghidra.app.util.opinion.AbstractLibrarySupportLoader;
 import ghidra.app.util.opinion.LoadSpec;
@@ -68,6 +67,10 @@ import hunk.Relocate;
 import hunk.Relocations;
 import hunk.Segment;
 import hunk.SegmentType;
+import structs.ExecLibrary;
+import structs.InitData_Type;
+import structs.InitTable;
+import structs.Resident;
 
 public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 
@@ -98,8 +101,7 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 	}
 
 	@Override
-	protected void load(ByteProvider provider, LoadSpec loadSpec, List<Option> options, Program program,
-			MemoryConflictHandler handler, TaskMonitor monitor, MessageLog log) throws IOException {
+	protected void load(ByteProvider provider, LoadSpec loadSpec, List<Option> options, Program program, TaskMonitor monitor, MessageLog log) throws IOException {
 
 		FlatProgramAPI fpa = new FlatProgramAPI(program);
 		Memory mem = program.getMemory();
@@ -117,7 +119,7 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 		List<byte[]> datas = rel.relocate(addrs);
 
 		Address startAddr = fpa.toAddr(addrs[0]);
-		setFunction(program, fpa, startAddr, "start", log);
+		setFunction(fpa, startAddr, "start", log);
 
 		for (Segment seg : bi.getSegments()) {
 			long segOffset = addrs[seg.getId()];
@@ -154,10 +156,8 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 				}
 			}
 		}
-
-		FdFunctionList funcsList = new FdFunctionList();
-
-		createBaseSegment(fpa, funcsList, log);
+		
+		createBaseSegment(fpa, log);
 
 		analyzeResident(mem, fpa, startAddr, log);
 	}
@@ -205,14 +205,14 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 					long it_InitFunc = mem.getInt(rt_InitAddr.add(12));
 
 					Address it_InitFuncAddr = fpa.toAddr(it_InitFunc);
-					setFunction(program, fpa, it_InitFuncAddr, String.format("it_InitFunc_%06X", addr.getOffset()),
+					setFunction(fpa, it_InitFuncAddr, String.format("it_InitFunc_%06X", addr.getOffset()),
 							log);
 					Function func = fpa.getFunctionAt(it_InitFuncAddr);
 					func.setCustomVariableStorage(true);
 
 					List<ParameterImpl> params = new ArrayList<>();
 
-					params.add(new ParameterImpl("base", PointerDataType.dataType, program.getRegister("A6"), program));
+					params.add(new ParameterImpl("libBase", PointerDataType.dataType, program.getRegister("A6"), program));
 					params.add(
 							new ParameterImpl("seglist", PointerDataType.dataType, program.getRegister("A0"), program));
 					params.add(new ParameterImpl("lib", PointerDataType.dataType, program.getRegister("D0"), program));
@@ -243,7 +243,7 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 
 					int i = 0;
 					boolean askedForFd = false;
-					FdFunctionTable funcTable = null;
+					FdLibFunctions funcTable = null;
 
 					while (true) {
 						long funcAddr = mem.getInt(it_FuncTableAddr.add(i * 4));
@@ -286,7 +286,7 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 								name = funcDef != null ? funcDef.getName(false) : String.format("LibFunc_%03d", i - 4);
 							}
 
-							setFunction(program, fpa, funcAddr_, name, log);
+							setFunction(fpa, funcAddr_, name, log);
 							func = fpa.getFunctionAt(funcAddr_);
 							func.setCustomVariableStorage(true);
 
@@ -296,8 +296,8 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 									program));
 
 							if (funcDef != null) {
-								HashMap<String, String> args = funcDef.getArgs();
-								for (Entry<String, String> arg : args.entrySet()) {
+								List<Map.Entry<String, String>> args = funcDef.getArgs();
+								for (Entry<String, String> arg : args) {
 									params.add(new ParameterImpl(arg.getKey(), DWordDataType.dataType,
 											program.getRegister(arg.getValue()), program));
 								}
@@ -332,11 +332,10 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 		return null;
 	}
 
-	private static void createBaseSegment(FlatProgramAPI fpa, FdFunctionList funcsList, MessageLog log) {
-		MemoryBlock exec = createSegment(null, fpa, "EXEC", 0x4, 4, true, false, log);
+	private static void createBaseSegment(FlatProgramAPI fpa, MessageLog log) {
+		MemoryBlock exec = createSegment(null, fpa, "EXEC", 0x4, 4, false, false, log);
 
-		FdFunctionTable tbl = funcsList.getFunctionTableByLib("exec_lib.fd");
-		AmigaLibrary lib = new AmigaLibrary("Exec", tbl, fpa.getCurrentProgram(), log);
+		ExecLibrary lib = new ExecLibrary();
 
 		try {
 			Program program = fpa.getCurrentProgram();
@@ -350,18 +349,18 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 		}
 	}
 
-	private static void setFunction(Program program, FlatProgramAPI fpa, Address address, String name, MessageLog log) {
+	public static void setFunction(FlatProgramAPI fpa, Address address, String name, MessageLog log) {
 		try {
 			fpa.disassemble(address);
 			fpa.createFunction(address, name);
 			fpa.addEntryPoint(address);
-			program.getSymbolTable().createLabel(address, name, SourceType.IMPORTED);
+			fpa.getCurrentProgram().getSymbolTable().createLabel(address, name, SourceType.IMPORTED);
 		} catch (InvalidInputException e) {
 			log.appendException(e);
 		}
 	}
 
-	private static MemoryBlock createSegment(InputStream stream, FlatProgramAPI fpa, String name, long address,
+	public static MemoryBlock createSegment(InputStream stream, FlatProgramAPI fpa, String name, long address,
 			long size, boolean write, boolean execute, MessageLog log) {
 		MemoryBlock block;
 		try {
@@ -394,7 +393,7 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 	}
 
 	@Override
-	public String validateOptions(ByteProvider provider, LoadSpec loadSpec, List<Option> options) {
+	public String validateOptions(ByteProvider provider, LoadSpec loadSpec, List<Option> options, Program program) {
 
 		imageBase = null;
 

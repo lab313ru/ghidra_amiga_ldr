@@ -1,4 +1,4 @@
-package amigahunk;
+package structs;
 
 import java.io.IOException;
 

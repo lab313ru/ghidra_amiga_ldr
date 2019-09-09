@@ -13,7 +13,7 @@ import ghidra.framework.Application;
 
 public class FdParser {
 
-	public static FdFunctionTable readFdFile(String libName) {
+	public static FdLibFunctions readFdFile(String libName) {
 		try {
 			File f = new File(libName);
 			
@@ -32,10 +32,10 @@ public class FdParser {
 		}
 	}
 	
-	private static FdFunctionTable readFd(File f) throws Exception {
+	private static FdLibFunctions readFd(File f) throws Exception {
 		final Pattern funcPat = Pattern.compile("([A-Za-z][_A-Za-z00-9]+)\\((.*)\\)\\((.*)\\)");
 		
-		FdFunctionTable funcTable = null;
+		FdLibFunctions funcTable = null;
 		
 		int bias = 0;
 		boolean privat = true;
@@ -62,7 +62,7 @@ public class FdParser {
 					String cmd = cmda[0];
 					
 					if (cmd.equals("base")) {
-						funcTable = new FdFunctionTable(cmda[1]);
+						funcTable = new FdLibFunctions(cmda[1]);
 					} else if (cmd.equals("bias")) {
 						bias = -1 * Integer.parseInt(cmda[1]);
 					} else if (cmd.equals("private")) {
@@ -116,7 +116,7 @@ public class FdParser {
 					
 					if (!arg[0].equals("")) {
 						for (int i = 0; i < arg.length; ++i) {
-							func.addArg(arg[i], reg[i]);
+							func.addArg(arg[i], reg[i].toUpperCase());
 						}
 					}
 					

@@ -17,33 +17,43 @@ package amigahunk;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import ghidra.app.plugin.core.analysis.ConstantPropagationContextEvaluator;
 import ghidra.app.services.AbstractAnalyzer;
 import ghidra.app.services.AnalyzerType;
 import ghidra.app.util.importer.MessageLog;
-import ghidra.feature.vt.gui.util.VTMatchApplyChoices.CallingConventionChoices;
 import ghidra.framework.options.Options;
 import ghidra.program.flatapi.FlatProgramAPI;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressSetView;
+import ghidra.program.model.data.DWordDataType;
+import ghidra.program.model.data.DataUtilities;
+import ghidra.program.model.data.PointerDataType;
+import ghidra.program.model.data.DataUtilities.ClearDataMode;
 import ghidra.program.model.lang.Register;
 import ghidra.program.model.listing.CodeUnit;
 import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.FunctionIterator;
 import ghidra.program.model.listing.Instruction;
+import ghidra.program.model.listing.ParameterImpl;
 import ghidra.program.model.listing.Program;
-import ghidra.program.model.pcode.FunctionPrototype;
+import ghidra.program.model.listing.Function.FunctionUpdateType;
 import ghidra.program.model.scalar.Scalar;
+import ghidra.program.model.symbol.SourceType;
+import ghidra.program.model.util.CodeUnitInsertionException;
 import ghidra.program.util.SymbolicPropogator;
 import ghidra.program.util.VarnodeContext;
 import ghidra.util.exception.CancelledException;
+import ghidra.util.exception.DuplicateNameException;
+import ghidra.util.exception.InvalidInputException;
 import ghidra.util.task.TaskMonitor;
 
 public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 	
 	private final List<String> filter = new ArrayList<String>();
-	private FdFunctionList funcsList;
+	private FdFunctionsInLibs funcsList;
 	
 	public static boolean isAmigaHunkLoader(Program program) {
 		return program.getExecutableFormat().equalsIgnoreCase(AmigaHunkLoader.AMIGA_HUNK);
@@ -64,7 +74,7 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 	@Override
 	public boolean canAnalyze(Program program) {
 		if (isAmigaHunkLoader(program)) {
-			funcsList = new FdFunctionList();
+			funcsList = new FdFunctionsInLibs();
 			return true;
 		}
 		
@@ -79,10 +89,9 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 			return;
 		}
 		
-		String[] libsList = funcsList.getLibsList();
+		String[] libsList = funcsList.getLibsList(filter);
 		for (String lib : libsList) {
-			boolean val = (filter != null) ? filter.contains(lib) : true;
-			options.registerOption(lib.replace("_lib.fd", "").toUpperCase(), val, null, String.format("Analyze calls from %s", lib));
+			options.registerOption(lib.replace("_lib.fd", "").toUpperCase(), true, null, String.format("Analyze calls from %s", lib));
 		}
 	}
 	
@@ -96,11 +105,9 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 		
 		filter.clear();
 		
-		String[] libsList = funcsList.getLibsList();
+		String[] libsList = funcsList.getLibsList(filter);
 		for (String lib : libsList) {
-			if (!options.getBoolean(lib.replace("_lib.fd", "").toUpperCase(), true)) {
-				filter.remove(lib);
-			} else {
+			if (options.getBoolean(lib.replace("_lib.fd", "").toUpperCase(), false)) {
 				filter.add(lib);
 			}
 		}
@@ -130,8 +137,56 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 				log.appendException(e);
 			}
 		}
+		
+		monitor.setMessage("Creating library functions...");
+		
+		FlatProgramAPI fpa = new FlatProgramAPI(program);
+		
+		try {
+			String[] libs = funcsList.getLibsList(filter);
+			
+			int i = 1;
+			for (String lib : libs) {
+				createFunctionsSegment(fpa, lib, i * 0x1000, funcsList.getFunctionTableByLib(lib), log);
+				i++;
+			}
+		} catch (InvalidInputException | DuplicateNameException | CodeUnitInsertionException e) {
+			log.appendException(e);
+		}
 
 		return true;
+	}
+	
+	private static void createFunctionsSegment(FlatProgramAPI fpa, String lib, long segAddr, FdLibFunctions funcs, MessageLog log) throws InvalidInputException, DuplicateNameException, CodeUnitInsertionException {
+		if (fpa.getMemoryBlock(fpa.toAddr(segAddr)) != null) {
+			return;
+		}
+		
+		AmigaHunkLoader.createSegment(null, fpa, lib, segAddr, 0x1000, true, true, log);
+		
+		for (FdFunction func : funcs.getFunctions()) {
+			Address funcAddress = fpa.toAddr(segAddr + Math.abs(func.getBias()));
+			AmigaHunkLoader.setFunction(fpa, funcAddress, func.getName(true).replace(FdFunction.LIB_SPLITTER, "_"), log);
+			Function function = fpa.getFunctionAt(funcAddress);
+			function.setCustomVariableStorage(true);
+
+			List<ParameterImpl> params = new ArrayList<>();
+
+			Program program = fpa.getCurrentProgram();
+			params.add(new ParameterImpl("libBase", PointerDataType.dataType, program.getRegister("A6"), program));
+
+			List<Map.Entry<String, String>> args = func.getArgs();
+			for (Entry<String, String> arg : args) {
+				params.add(new ParameterImpl(arg.getKey(), DWordDataType.dataType,
+						program.getRegister(arg.getValue()), program));
+			}
+
+			function.updateFunction(null, null, FunctionUpdateType.CUSTOM_STORAGE, true,
+					SourceType.ANALYSIS, params.toArray(ParameterImpl[]::new));
+			
+			DataUtilities.createData(program, funcAddress, DWordDataType.dataType, -1, false,
+					ClearDataMode.CLEAR_ALL_UNDEFINED_CONFLICT_DATA);
+		}
 	}
 	
 	public AddressSetView flowConstants(final Program program, Address flowStart,

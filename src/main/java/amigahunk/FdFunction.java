@@ -1,6 +1,9 @@
 package amigahunk;
 
-import java.util.HashMap;
+import java.util.AbstractMap;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map.Entry;
 import java.util.stream.Collectors;
 
 import ghidra.program.model.lang.Register;
@@ -14,7 +17,9 @@ public class FdFunction {
 	private final boolean privat;
 	private final int index;
 	
-	private HashMap<String, String> args;
+	private List<Entry<String, String>> args;
+	
+	public static final String LIB_SPLITTER = "->";
 	
 	public FdFunction(String lib, String name, int bias, boolean privat) {
 		this.lib = lib;
@@ -23,7 +28,7 @@ public class FdFunction {
 		this.index = (bias - 6) / 6;
 		this.privat = privat;
 		
-		args = new HashMap<String, String>();
+		args = new ArrayList<>();
 	}
 	
 	public final String getLib() {
@@ -31,7 +36,7 @@ public class FdFunction {
 	}
 
 	public final String getName(boolean withLib) {
-		return (withLib ? lib.replace("_lib.fd", ".library") + "->" : "") + name;
+		return (withLib ? lib.replace("_lib.fd", ".library") + LIB_SPLITTER : "") + name;
 	}
 
 	public final int getBias() {
@@ -46,12 +51,12 @@ public class FdFunction {
 		return privat;
 	}
 	
-	public HashMap<String, String> getArgs() {
+	public List<Entry<String, String>> getArgs() {
 		return args;
 	}
 	
 	public void addArg(String name, String reg) {
-		args.put(name, reg);
+		args.add(new AbstractMap.SimpleEntry<String, String>(name, reg));
 	}
 	
 	public String getArgsStr(boolean withReg) {
@@ -62,11 +67,11 @@ public class FdFunction {
 			sb.append("( ");
 			
 			if (withReg) {
-				sb.append(args.entrySet().stream()
+				sb.append(args.stream()
 						.map(e -> e.getKey() + "/" + e.getValue())
 						.collect(Collectors.joining(", ")));
 			} else {
-				sb.append(args.keySet().stream()
+				sb.append(args.stream()
 						.map(Object::toString)
 						.collect(Collectors.joining(", ")));
 			}
@@ -80,7 +85,7 @@ public class FdFunction {
 		if (args.size() == 0) {
 			return new Register[] {};
 		} else {
-			return args.entrySet().stream()
+			return args.stream()
 					.map(e -> new Register(program.getRegister(e.getValue()))).toArray(Register[]::new);
 		}
 	}
