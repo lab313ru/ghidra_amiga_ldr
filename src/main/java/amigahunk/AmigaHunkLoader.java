@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.concurrent.TimeUnit;
 
 import javax.swing.JFileChooser;
 import javax.swing.filechooser.FileNameExtensionFilter;
@@ -45,6 +46,9 @@ import ghidra.program.model.data.DataType;
 import ghidra.program.model.data.DataUtilities;
 import ghidra.program.model.data.DataUtilities.ClearDataMode;
 import ghidra.program.model.data.PointerDataType;
+import ghidra.program.model.data.Structure;
+import ghidra.program.model.data.StructureDataType;
+import ghidra.program.model.data.WordDataType;
 import ghidra.program.model.lang.Language;
 import ghidra.program.model.lang.LanguageCompilerSpecPair;
 import ghidra.program.model.lang.LanguageNotFoundException;
@@ -70,6 +74,7 @@ import hunk.SegmentType;
 import structs.ExecLibrary;
 import structs.InitData_Type;
 import structs.InitTable;
+import structs.Library;
 import structs.Resident;
 
 public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
@@ -211,11 +216,14 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 					func.setCustomVariableStorage(true);
 
 					List<ParameterImpl> params = new ArrayList<>();
+					
+					Structure baseStruct = new StructureDataType("BaseLib", 0);
+					baseStruct.add((new Library()).toDataType(), "base", null);
+					baseStruct.add(WordDataType.dataType, "field0", null);
 
 					params.add(new ParameterImpl("libBase", PointerDataType.dataType, program.getRegister("A6"), program));
-					params.add(
-							new ParameterImpl("seglist", PointerDataType.dataType, program.getRegister("A0"), program));
-					params.add(new ParameterImpl("lib", PointerDataType.dataType, program.getRegister("D0"), program));
+					params.add(new ParameterImpl("seglist", PointerDataType.dataType, program.getRegister("A0"), program));
+					params.add(new ParameterImpl("lib", new PointerDataType(baseStruct), program.getRegister("D0"), program));
 
 					func.updateFunction(null, null, FunctionUpdateType.CUSTOM_STORAGE, true, SourceType.ANALYSIS,
 							params.toArray(ParameterImpl[]::new));
@@ -251,6 +259,7 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 						Address funcAddr_ = fpa.toAddr(funcAddr);
 						if (mem.contains(funcAddr_)) {
 							if (!askedForFd && i >= 4) {
+								TimeUnit.MILLISECONDS.sleep(400);
 								if (OptionDialog.YES_OPTION == OptionDialog.showYesNoDialogWithNoAsDefaultButton(null,
 										"Question", "Do you have *_lib.fd file for this library?")) {
 									String fdPath = showSelectFile("Select file...");
@@ -292,7 +301,7 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 
 							params = new ArrayList<>();
 
-							params.add(new ParameterImpl("base", PointerDataType.dataType, program.getRegister("A6"),
+							params.add(new ParameterImpl("base", new PointerDataType(baseStruct), program.getRegister("A6"),
 									program));
 
 							if (funcDef != null) {
@@ -313,7 +322,7 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 				}
 			}
 		} catch (InvalidInputException | MemoryAccessException | AddressOutOfBoundsException
-				| CodeUnitInsertionException | DuplicateNameException | IOException e) {
+				| CodeUnitInsertionException | DuplicateNameException | IOException | InterruptedException e) {
 			log.appendException(e);
 		}
 	}

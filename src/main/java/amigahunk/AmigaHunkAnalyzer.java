@@ -30,10 +30,8 @@ import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressSetView;
 import ghidra.program.model.data.DWordDataType;
 import ghidra.program.model.data.DataUtilities;
-import ghidra.program.model.data.PointerDataType;
 import ghidra.program.model.data.DataUtilities.ClearDataMode;
 import ghidra.program.model.lang.Register;
-import ghidra.program.model.listing.CodeUnit;
 import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.FunctionIterator;
 import ghidra.program.model.listing.Instruction;
@@ -41,6 +39,7 @@ import ghidra.program.model.listing.ParameterImpl;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.listing.Function.FunctionUpdateType;
 import ghidra.program.model.scalar.Scalar;
+import ghidra.program.model.symbol.RefType;
 import ghidra.program.model.symbol.SourceType;
 import ghidra.program.model.util.CodeUnitInsertionException;
 import ghidra.program.util.SymbolicPropogator;
@@ -115,6 +114,22 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 
 	@Override
 	public boolean added(Program program, AddressSetView set, TaskMonitor monitor, MessageLog log) {
+		monitor.setMessage("Creating library functions...");
+		
+		FlatProgramAPI fpa = new FlatProgramAPI(program);
+		
+		try {
+			String[] libs = funcsList.getLibsList(filter);
+			
+			int i = 1;
+			for (String lib : libs) {
+				createFunctionsSegment(fpa, lib, i * 0x1000, funcsList.getFunctionTableByLib(lib), log);
+				i++;
+			}
+		} catch (InvalidInputException | DuplicateNameException | CodeUnitInsertionException e) {
+			log.appendException(e);
+		}
+		
 		monitor.setMessage("Analysing library calls...");
 		
 		FunctionIterator fiter = program.getFunctionManager().getFunctions(set, true);
@@ -137,22 +152,6 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 				log.appendException(e);
 			}
 		}
-		
-		monitor.setMessage("Creating library functions...");
-		
-		FlatProgramAPI fpa = new FlatProgramAPI(program);
-		
-		try {
-			String[] libs = funcsList.getLibsList(filter);
-			
-			int i = 1;
-			for (String lib : libs) {
-				createFunctionsSegment(fpa, lib, i * 0x1000, funcsList.getFunctionTableByLib(lib), log);
-				i++;
-			}
-		} catch (InvalidInputException | DuplicateNameException | CodeUnitInsertionException e) {
-			log.appendException(e);
-		}
 
 		return true;
 	}
@@ -173,7 +172,6 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 			List<ParameterImpl> params = new ArrayList<>();
 
 			Program program = fpa.getCurrentProgram();
-			params.add(new ParameterImpl("libBase", PointerDataType.dataType, program.getRegister("A6"), program));
 
 			List<Map.Entry<String, String>> args = func.getArgs();
 			for (Entry<String, String> arg : args) {
@@ -202,19 +200,13 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 					if (mnemonic.equals("jsr")) {
 						Object[] objs = instr.getOpObjects(0);
 						Register reg = instr.getRegister(1);
-						if (reg != null && reg.getName().equals("A6") &&
-								objs.length != 0 && (objs[0] instanceof Scalar)) {
+						if (reg != null && reg.getName().equals("A6") && objs.length != 0 && (objs[0] instanceof Scalar)) {
 							FdFunction[] funcs = funcsList.getLibsFunctionsByBias(filter, (int)((Scalar)objs[0]).getSignedValue());
 							
-							StringBuilder sb = new StringBuilder();
-							
 							for (FdFunction func : funcs) {
-								sb.append(func.getName(true));
-								sb.append(func.getArgsStr(true));
-								sb.append(System.getProperty("line.separator"));
+								Address funcStart = program.getMemory().getBlock(func.getLib()).getStart().add(Math.abs(func.getBias()));
+								instr.addOperandReference(1, funcStart, RefType.CALL_OVERRIDE_UNCONDITIONAL, SourceType.ANALYSIS);
 							}
-
-							program.getListing().setComment(instr.getAddress(), CodeUnit.PRE_COMMENT, sb.toString().strip());
 						}
 					}
 					return false;
