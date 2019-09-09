@@ -207,6 +207,15 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 								Address funcStart = program.getMemory().getBlock(func.getLib()).getStart().add(Math.abs(func.getBias()));
 								instr.addOperandReference(1, funcStart, RefType.CALL_OVERRIDE_UNCONDITIONAL, SourceType.ANALYSIS);
 							}
+							
+							for (int i = 0; i < funcs.length; ++i) {
+								FdFunction func = funcs[i];
+								
+								if (!func.isPrivate()) {
+									instr.setPrimaryMemoryReference(instr.getOperandReferences(1)[i]);
+									break;
+								}
+							}
 						}
 					}
 					return false;

@@ -259,7 +259,7 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 						Address funcAddr_ = fpa.toAddr(funcAddr);
 						if (mem.contains(funcAddr_)) {
 							if (!askedForFd && i >= 4) {
-								TimeUnit.MILLISECONDS.sleep(400);
+								TimeUnit.SECONDS.sleep(1);
 								if (OptionDialog.YES_OPTION == OptionDialog.showYesNoDialogWithNoAsDefaultButton(null,
 										"Question", "Do you have *_lib.fd file for this library?")) {
 									String fdPath = showSelectFile("Select file...");

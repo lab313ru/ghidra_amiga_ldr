@@ -47,7 +47,7 @@ public class FdFunction {
 		return index;
 	}
 
-	public final boolean isPrivat() {
+	public final boolean isPrivate() {
 		return privat;
 	}
 	
