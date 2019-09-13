@@ -41,8 +41,7 @@ import ghidra.framework.model.DomainObject;
 import ghidra.program.flatapi.FlatProgramAPI;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressOutOfBoundsException;
-import ghidra.program.model.data.DWordDataType;
-import ghidra.program.model.data.DataType;
+import ghidra.program.model.data.DataTypeConflictHandler;
 import ghidra.program.model.data.DataUtilities;
 import ghidra.program.model.data.DataUtilities.ClearDataMode;
 import ghidra.program.model.data.PointerDataType;
@@ -75,7 +74,10 @@ import structs.ExecLibrary;
 import structs.InitData_Type;
 import structs.InitTable;
 import structs.Library;
+import structs.Message;
 import structs.Resident;
+import structs.WBArg;
+import structs.WBStartup;
 
 public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 
@@ -165,6 +167,18 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 		createBaseSegment(fpa, log);
 
 		analyzeResident(mem, fpa, startAddr, log);
+		
+		addCustomTypes(program, log);
+	}
+	
+	private static void addCustomTypes(Program program, MessageLog log) {
+		try {
+			program.getDataTypeManager().addDataType((new Message()).toDataType(), DataTypeConflictHandler.DEFAULT_HANDLER);
+			program.getDataTypeManager().addDataType((new WBArg()).toDataType(), DataTypeConflictHandler.DEFAULT_HANDLER);
+			program.getDataTypeManager().addDataType((new WBStartup()).toDataType(), DataTypeConflictHandler.DEFAULT_HANDLER);
+		} catch (DuplicateNameException | IOException e) {
+			log.appendException(e);
+		}
 	}
 
 	private static byte[] intToBytes(int x) {
@@ -261,7 +275,7 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 							if (!askedForFd && i >= 4) {
 								TimeUnit.SECONDS.sleep(1);
 								if (OptionDialog.YES_OPTION == OptionDialog.showYesNoDialogWithNoAsDefaultButton(null,
-										"Question", "Do you have *_lib.fd file for this library?")) {
+										"Question", String.format("Do you have *%s file for this library?", FdParser.LIB_FD_EXT))) {
 									String fdPath = showSelectFile("Select file...");
 									funcTable = FdParser.readFdFile(fdPath);
 								}
@@ -307,7 +321,7 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 							if (funcDef != null) {
 								List<Map.Entry<String, String>> args = funcDef.getArgs();
 								for (Entry<String, String> arg : args) {
-									params.add(new ParameterImpl(arg.getKey(), DWordDataType.dataType,
+									params.add(new ParameterImpl(arg.getKey(), PointerDataType.dataType,
 											program.getRegister(arg.getValue()), program));
 								}
 							}
@@ -344,13 +358,10 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 	private static void createBaseSegment(FlatProgramAPI fpa, MessageLog log) {
 		MemoryBlock exec = createSegment(null, fpa, "EXEC", 0x4, 4, false, false, log);
 
-		ExecLibrary lib = new ExecLibrary();
-
 		try {
 			Program program = fpa.getCurrentProgram();
-			DataType dt = lib.toDataType();
 
-			DataUtilities.createData(program, exec.getStart(), new PointerDataType(dt), -1, false,
+			DataUtilities.createData(program, exec.getStart(), new PointerDataType((new ExecLibrary()).toDataType()), -1, false,
 					ClearDataMode.CLEAR_ALL_UNDEFINED_CONFLICT_DATA);
 
 		} catch (DuplicateNameException | IOException | CodeUnitInsertionException e) {

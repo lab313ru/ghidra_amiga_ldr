@@ -15,7 +15,7 @@ public class ExecLibrary implements StructConverter {
 	public DataType toDataType() throws DuplicateNameException, IOException {
 		Structure s = new StructureDataType("ExecLib", 0);
 
-		s.add(new PointerDataType((new Library()).toDataType()), "LibNode", null);
+		s.add((new Library()).toDataType(), "LibNode", null);
 		s.add(WORD, "SoftVer", null);
 		s.add(WORD, "LowMemChkSum", null);
 		s.add(DWORD, "ChkBase", null);
@@ -32,7 +32,7 @@ public class ExecLibrary implements StructConverter {
 		s.add(WORD, "ChkSum", null);
 		DataType intVector = (new IntVector()).toDataType();
 		s.add(new ArrayDataType(intVector, 16, intVector.getLength()), "IntVects", null);
-		s.add(new PointerDataType((new Task()).toDataType()), "ThisTask", null);
+		s.add(new PointerDataType((new Process()).toDataType()), "ThisTask", null);
 		s.add(DWORD, "IdleCount", null);
 		s.add(DWORD, "DispCount", null);
 		s.add(WORD, "Quantum", null);

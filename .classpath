@@ -265,6 +265,11 @@
 			<attribute name="javadoc_location" value="jar:file:/D:\ghidra_9.1_DEV\docs\GhidraAPI_javadoc.zip!/api/"/>
 		</attributes>
 	</classpathentry>
+	<classpathentry kind="lib" path="D:/ghidra_9.1_DEV/Ghidra/Processors/HCS12/lib/HCS12.jar" sourcepath="D:/ghidra_9.1_DEV/Ghidra/Processors/HCS12/lib/HCS12-src.zip">
+		<attributes>
+			<attribute name="javadoc_location" value="jar:file:/D:\ghidra_9.1_DEV\docs\GhidraAPI_javadoc.zip!/api/"/>
+		</attributes>
+	</classpathentry>
 	<classpathentry kind="lib" path="D:/ghidra_9.1_DEV/Ghidra/Framework/Help/lib/Help.jar" sourcepath="D:/ghidra_9.1_DEV/Ghidra/Framework/Help/lib/Help-src.zip">
 		<attributes>
 			<attribute name="javadoc_location" value="jar:file:/D:\ghidra_9.1_DEV\docs\GhidraAPI_javadoc.zip!/api/"/>
@@ -390,12 +395,22 @@
 			<attribute name="javadoc_location" value="jar:file:/D:\ghidra_9.1_DEV\docs\GhidraAPI_javadoc.zip!/api/"/>
 		</attributes>
 	</classpathentry>
+	<classpathentry kind="lib" path="D:/ghidra_9.1_DEV/Ghidra/Processors/SuperH4/lib/SuperH4.jar">
+		<attributes>
+			<attribute name="javadoc_location" value="jar:file:/D:\ghidra_9.1_DEV\docs\GhidraAPI_javadoc.zip!/api/"/>
+		</attributes>
+	</classpathentry>
 	<classpathentry kind="lib" path="D:/ghidra_9.1_DEV/Ghidra/Framework/Utility/lib/Utility.jar" sourcepath="D:/ghidra_9.1_DEV/Ghidra/Framework/Utility/lib/Utility-src.zip">
 		<attributes>
 			<attribute name="javadoc_location" value="jar:file:/D:\ghidra_9.1_DEV\docs\GhidraAPI_javadoc.zip!/api/"/>
 		</attributes>
 	</classpathentry>
 	<classpathentry kind="lib" path="D:/ghidra_9.1_DEV/Ghidra/Features/VersionTracking/lib/VersionTracking.jar" sourcepath="D:/ghidra_9.1_DEV/Ghidra/Features/VersionTracking/lib/VersionTracking-src.zip">
+		<attributes>
+			<attribute name="javadoc_location" value="jar:file:/D:\ghidra_9.1_DEV\docs\GhidraAPI_javadoc.zip!/api/"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="D:/ghidra_9.1_DEV/Ghidra/Extensions/ghidra_amiga_ldr/lib/ghidra_amiga_ldr.jar">
 		<attributes>
 			<attribute name="javadoc_location" value="jar:file:/D:\ghidra_9.1_DEV\docs\GhidraAPI_javadoc.zip!/api/"/>
 		</attributes>

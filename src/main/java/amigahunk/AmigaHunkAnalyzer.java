@@ -28,9 +28,11 @@ import ghidra.framework.options.Options;
 import ghidra.program.flatapi.FlatProgramAPI;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressSetView;
-import ghidra.program.model.data.DWordDataType;
+import ghidra.program.model.data.ArrayDataType;
+import ghidra.program.model.data.ByteDataType;
 import ghidra.program.model.data.DataUtilities;
 import ghidra.program.model.data.DataUtilities.ClearDataMode;
+import ghidra.program.model.data.PointerDataType;
 import ghidra.program.model.lang.Register;
 import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.FunctionIterator;
@@ -61,8 +63,8 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 	public AmigaHunkAnalyzer() {
 		super("Amiga Library Calls", "Analyses calls to system libraries", AnalyzerType.INSTRUCTION_ANALYZER);
 		
-		filter.add("exec_lib.fd");
-		filter.add("dos_lib.fd");
+		filter.add(FdParser.EXEC_LIB);
+		filter.add(FdParser.DOS_LIB);
 	}
 
 	@Override
@@ -90,7 +92,7 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 		
 		String[] libsList = funcsList.getLibsList(filter);
 		for (String lib : libsList) {
-			options.registerOption(lib.replace("_lib.fd", "").toUpperCase(), true, null, String.format("Analyze calls from %s", lib));
+			options.registerOption(lib.replace(FdParser.LIB_FD_EXT, "").toUpperCase(), true, null, String.format("Analyze calls from %s", lib));
 		}
 	}
 	
@@ -106,7 +108,7 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 		
 		String[] libsList = funcsList.getLibsList(filter);
 		for (String lib : libsList) {
-			if (options.getBoolean(lib.replace("_lib.fd", "").toUpperCase(), false)) {
+			if (options.getBoolean(lib.replace(FdParser.LIB_FD_EXT, "").toUpperCase(), false)) {
 				filter.add(lib);
 			}
 		}
@@ -175,14 +177,14 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 
 			List<Map.Entry<String, String>> args = func.getArgs();
 			for (Entry<String, String> arg : args) {
-				params.add(new ParameterImpl(arg.getKey(), DWordDataType.dataType,
+				params.add(new ParameterImpl(arg.getKey(), PointerDataType.dataType,
 						program.getRegister(arg.getValue()), program));
 			}
 
 			function.updateFunction(null, null, FunctionUpdateType.CUSTOM_STORAGE, true,
 					SourceType.ANALYSIS, params.toArray(ParameterImpl[]::new));
 			
-			DataUtilities.createData(program, funcAddress, DWordDataType.dataType, -1, false,
+			DataUtilities.createData(program, funcAddress, new ArrayDataType(ByteDataType.dataType, 6, -1), -1, false,
 					ClearDataMode.CLEAR_ALL_UNDEFINED_CONFLICT_DATA);
 		}
 	}
@@ -211,7 +213,7 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 							for (int i = 0; i < funcs.length; ++i) {
 								FdFunction func = funcs[i];
 								
-								if (!func.isPrivate()) {
+								if (!func.isPrivate() && func.getLib().equals(FdParser.EXEC_LIB)) {
 									instr.setPrimaryMemoryReference(instr.getOperandReferences(1)[i]);
 									break;
 								}

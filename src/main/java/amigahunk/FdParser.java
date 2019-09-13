@@ -12,6 +12,10 @@ import java.util.regex.Pattern;
 import ghidra.framework.Application;
 
 public class FdParser {
+	
+	public static final String LIB_FD_EXT = "_lib.fd";
+	public static final String EXEC_LIB = "exec" + LIB_FD_EXT;
+	public static final String DOS_LIB = "dos" + LIB_FD_EXT;
 
 	public static FdLibFunctions readFdFile(String libName) {
 		try {
