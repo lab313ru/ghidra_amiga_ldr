@@ -3,6 +3,7 @@
 /bin/
 /build/
 /dist/
+/samples/
 *.class
 .antProperties.xml
 .classpath
