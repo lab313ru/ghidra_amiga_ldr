@@ -1,31 +1,18 @@
 package hunk;
 
-import ghidra.app.util.bin.BinaryReader;
 import ghidra.app.util.importer.MessageLog;
 
 public final class BinFmtHunk {
-	
-	public static boolean isImageFile(BinaryReader reader) {
-		HunkBlockFile hbf = new HunkBlockFile();
-		
-		return hbf.peekType(reader) == HunkBlockType.TYPE_LOADSEG;
-	}
-	
-	public static BinImage loadImage(BinaryReader reader, MessageLog log) {
-		HunkBlockFile hbf = new HunkBlockFile();
-		
+
+	public static BinImage loadImage(HunkBlockFile hbf, MessageLog log) {
 		try {
-			hbf.read(reader);
-			
 			HunkLoadSegFile lsf = new HunkLoadSegFile();
 			lsf.parseBlockFile(hbf);
-			
 			return createImageFromLoadSegFile(lsf);
 		} catch (HunkParseError e) {
 			log.appendException(e);
+			return null;
 		}
-		
-		return null;
 	}
 	
 	private static BinImage createImageFromLoadSegFile(HunkLoadSegFile lsf) throws HunkParseError {

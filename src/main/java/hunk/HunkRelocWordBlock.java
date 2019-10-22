@@ -8,12 +8,15 @@ import ghidra.app.util.bin.BinaryReader;
 
 class HunkRelocWordBlock extends HunkRelocBlock {
 
-	HunkRelocWordBlock(HunkType type) {
-		super(type);
+	HunkRelocWordBlock(HunkType type, BinaryReader reader) throws HunkParseError {
+		super(type, reader);
+
+		parse();
+		calcHunkSize();
 	}
 	
 	@Override
-	public void parse(BinaryReader reader) throws HunkParseError {		
+	void parse() throws HunkParseError {		
 		try {
 			int numWords = 0;
 			

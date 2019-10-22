@@ -8,12 +8,15 @@ import ghidra.app.util.bin.BinaryReader;
 
 class HunkRelocLongBlock extends HunkRelocBlock {
 	
-	public HunkRelocLongBlock(HunkType type) {
-		super(type);
+	public HunkRelocLongBlock(HunkType type, BinaryReader reader) throws HunkParseError {
+		super(type, reader);
+
+		parse();
+		calcHunkSize();
 	}
 
 	@Override
-	public void parse(BinaryReader reader) throws HunkParseError {
+	void parse() throws HunkParseError {
 		while (true) {
 			try {
 				int num = reader.readNextInt();

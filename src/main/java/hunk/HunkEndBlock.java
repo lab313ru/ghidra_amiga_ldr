@@ -4,13 +4,14 @@ import ghidra.app.util.bin.BinaryReader;
 
 class HunkEndBlock extends HunkBlock {
 
-	public HunkEndBlock() {
-		super(HunkType.HUNK_END);
+	public HunkEndBlock(BinaryReader reader) throws HunkParseError {
+		super(HunkType.HUNK_END, reader);
+		parse();
+		calcHunkSize();
 	}
 
 	@Override
-	public void parse(BinaryReader reader) {
-		
+	void parse() throws HunkParseError {
+		// TODO Auto-generated method stub
 	}
-
 }

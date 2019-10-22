@@ -6,36 +6,46 @@ import ghidra.app.util.bin.BinaryReader;
 
 class HunkExtBlock extends HunkBlock {
 	
-	HunkExtBlock() {
-		super(HunkType.HUNK_EXT);
+	HunkExtBlock(BinaryReader reader) throws HunkParseError {
+		super(HunkType.HUNK_EXT, reader);
+		parse();
+		calcHunkSize();
 	}
 
 	@Override
-	public void parse(BinaryReader reader) throws HunkParseError {
+	void parse() throws HunkParseError {
 		while (true) {
 			try {
-				int tag = reader.readNextInt();
+				long tag = reader.readNextUnsignedInt();
 
 				if (tag == 0) {
 					break;
 				}
 
-				ExtType extType = ExtType.fromInteger(tag >> 24);
+				ExtType extType = ExtType.fromInteger((int)(tag >> 24));
 
-				reader.readNextAsciiString(tag & 0xFFFFFF);
+				readNameSize(reader, (int)(tag & 0xFFFFFF));
 
 				if (extType == null) {
 					throw new IOException();
-				} else if (extType == ExtType.EXT_ABSCOMMON) {
+				} else if (
+						extType == ExtType.EXT_ABSCOMMON ||
+						extType == ExtType.EXT_RELCOMMON ||
+						extType == ExtType.EXT_DEF ||
+						extType == ExtType.EXT_ABS ||
+						extType == ExtType.EXT_RES
+						) {
 					reader.readNextInt();
-				} else if (extType.getIntValue() >= 0x80) {
+				} else {
 					int numRefs = reader.readNextInt();
 					
-					for (int i = 0; i < numRefs; ++i) {
-						reader.readNextUnsignedInt();
+					if (numRefs == 0) {
+						numRefs = 1;
 					}
-				} else {
-					reader.readNextInt();
+					
+					for (int i = 0; i < numRefs; ++i) {
+						reader.readNextInt();
+					}
 				}
 			} catch (IOException e) {
 				throw new HunkParseError(e);

@@ -8,12 +8,14 @@ class HunkDebugBlock extends HunkBlock {
 
 	private byte[] debugData = null;
 	
-	public HunkDebugBlock() {
-		super(HunkType.HUNK_DEBUG);
+	public HunkDebugBlock(BinaryReader reader) throws HunkParseError {
+		super(HunkType.HUNK_DEBUG, reader);
+		parse();
+		calcHunkSize();
 	}
 
 	@Override
-	public void parse(BinaryReader reader) throws HunkParseError {
+	void parse() throws HunkParseError {
 		try {
 			int numLongs = reader.readNextInt();
 			debugData = reader.readNextByteArray(numLongs * 4);
@@ -25,5 +27,4 @@ class HunkDebugBlock extends HunkBlock {
 	public byte[] getData() {
 		return debugData;
 	}
-
 }

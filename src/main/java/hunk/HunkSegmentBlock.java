@@ -9,18 +9,20 @@ class HunkSegmentBlock extends HunkBlock {
 	private byte[] data = null;
 	private int sizeLongs = 0;
 	
-	HunkSegmentBlock(HunkType type) {
-		super(type);
+	HunkSegmentBlock(HunkType type, BinaryReader reader) throws HunkParseError {
+		super(type, reader);
+
+		parse();
+		calcHunkSize();
 	}
 	
 	@Override
-	public void parse(BinaryReader reader) throws HunkParseError {
+	void parse() throws HunkParseError {
 		try {
 			int size = sizeLongs = reader.readNextInt();
 			
 			if (super.getHunkType() != HunkType.HUNK_BSS) {
 				size *= 4;
-				reader.getPointerIndex();
 				data = reader.readNextByteArray(size);
 			}
 		} catch (IOException e) {

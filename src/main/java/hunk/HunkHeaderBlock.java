@@ -10,14 +10,19 @@ class HunkHeaderBlock extends HunkBlock {
 
 	private final List<Integer> hunkTable;
 
-	HunkHeaderBlock() {
-		super(HunkType.HUNK_HEADER);
+	HunkHeaderBlock(BinaryReader reader) throws HunkParseError {
+		super(HunkType.HUNK_HEADER, reader);
 		
 		hunkTable = new ArrayList<>();
+		
+		parse();
+		calcHunkSize();
 	}
 	
 	@Override
-	public void parse(BinaryReader reader) throws HunkParseError {
+	void parse() throws HunkParseError {
+		long startOffset = reader.getPointerIndex();
+		
 		while (true) {
 			try {
 				String name = HunkBlock.readName(reader);
@@ -56,12 +61,7 @@ class HunkHeaderBlock extends HunkBlock {
 		}
 	}
 
-	int[] getHunkTable() {
-		int[] res = new int[hunkTable.size()];
-		
-		for (int i = 0; i < res.length; ++i) {
-			res[i] = hunkTable.get(i);
-		}
-		return res;
+	Integer[] getHunkTable() {
+		return hunkTable.toArray(Integer[]::new);
 	}
 }

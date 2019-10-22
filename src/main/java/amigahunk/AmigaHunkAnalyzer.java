@@ -130,6 +130,7 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 			}
 		} catch (InvalidInputException | DuplicateNameException | CodeUnitInsertionException e) {
 			log.appendException(e);
+			return false;
 		}
 		
 		monitor.setMessage("Analysing library calls...");
@@ -152,6 +153,7 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 				flowConstants(program, start, func.getBody(), symEval,  monitor);
 			} catch (CancelledException e) {
 				log.appendException(e);
+				return false;
 			}
 		}
 

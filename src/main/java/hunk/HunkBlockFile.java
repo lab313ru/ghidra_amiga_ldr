@@ -1,42 +1,62 @@
 package hunk;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.SortedMap;
+import java.util.TreeMap;
 
 import ghidra.app.util.bin.BinaryReader;
 
-class HunkBlockFile {
-	private List<HunkBlock> blocksList;
+public class HunkBlockFile {
+	private SortedMap<Long, HunkBlock> blocksList;
+	private HunkBlockType blockType;
+	private BinaryReader reader;
 	
-	HunkBlockFile() {
-		blocksList = new ArrayList<>();
-	}
-	
-	HunkBlock[] getBlocks() {
-		return blocksList.toArray(HunkBlock[]::new);
-	}
-	
-	void read(BinaryReader reader) throws HunkParseError {
+	public static boolean isHunkBlockFile(BinaryReader reader) {
+		HunkBlockFile hbf;
 		try {
-			while (reader.getPointerIndex() + 4 <= reader.length()) {
+			hbf = new HunkBlockFile(reader);
+			return hbf.getHunkBlockType() != HunkBlockType.TYPE_UNKNOWN;
+		} catch (HunkParseError e) {
+			return false;
+		}
+	}
+	
+	public HunkBlockFile(BinaryReader reader) throws HunkParseError {
+		blocksList = new TreeMap<>();
+		blockType = peekType(reader);
+		this.reader = reader;
+	}
+	
+	public SortedMap<Long, HunkBlock> getHunkBlocks() {
+		return blocksList;
+	}
+	
+	public void load() throws HunkParseError {
+		try {
+			long pos = reader.getPointerIndex();
+			while (pos + 4 <= reader.length()) {
 				int tag = reader.readNextInt();
 
-				HunkBlock block = HunkBlock.fromHunkType(HunkType.fromInteger(tag & HunkType.HUNK_TYPE_MASK));
+				HunkBlock block = HunkBlock.fromHunkType(HunkType.fromInteger(tag & HunkType.HUNK_TYPE_MASK), reader);
 				
 				if (block == null) {
 					throw new HunkParseError(String.format("Unsupported hunk type: %04d", tag & HunkType.HUNK_TYPE_MASK));
 				}
+
+				blocksList.put(pos, block);
 				
-				block.parse(reader);
-				blocksList.add(block);
+				pos = reader.getPointerIndex();
 			}
 		} catch (IOException e) {
 			throw new HunkParseError(e);
 		}
 	}
 	
-	HunkBlockType peekType(BinaryReader reader) {
+	public HunkBlockType getHunkBlockType() {
+		return blockType;
+	}
+	
+	private static HunkBlockType peekType(BinaryReader reader) {
 		long pos = reader.getPointerIndex();
 		
 		try {

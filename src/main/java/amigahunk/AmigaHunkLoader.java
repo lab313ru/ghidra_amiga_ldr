@@ -65,6 +65,10 @@ import ghidra.util.exception.InvalidInputException;
 import ghidra.util.task.TaskMonitor;
 import hunk.BinFmtHunk;
 import hunk.BinImage;
+import hunk.HunkBlock;
+import hunk.HunkBlockFile;
+import hunk.HunkLibBlock;
+import hunk.HunkParseError;
 import hunk.Reloc;
 import hunk.Relocate;
 import hunk.Relocations;
@@ -100,7 +104,7 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 	public Collection<LoadSpec> findSupportedLoadSpecs(ByteProvider provider) {
 		List<LoadSpec> loadSpecs = new ArrayList<>();
 
-		if (BinFmtHunk.isImageFile(new BinaryReader(provider, false))) {
+		if (HunkBlockFile.isHunkBlockFile(new BinaryReader(provider, false))) {
 			loadSpecs.add(new LoadSpec(this, 0, new LanguageCompilerSpecPair("68000:BE:32:default", "default"), true));
 		}
 
@@ -114,16 +118,56 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 		Memory mem = program.getMemory();
 
 		BinaryReader reader = new BinaryReader(provider, false);
-		BinImage bi = BinFmtHunk.loadImage(reader, log);
-
+		HunkBlockFile hbf = new HunkBlockFile(reader);
+		hbf.load();
+		
+		switch (hbf.getHunkBlockType()) {
+		case TYPE_LOADSEG: {
+			loadExecutable(imageBase, hbf, fpa, mem, log);
+		} break;
+		case TYPE_LIB: {
+			
+		} break;
+		case TYPE_UNIT: {
+			
+		} break;
+		default: {
+			
+		} break;
+		}
+	}
+	
+	private static void loadLibrary(BinaryReader reader, MessageLog log) {
+		try {
+			HunkLibBlock hlb = new HunkLibBlock(reader);
+			SortedMap<Long, HunkBlock> blocks = hlb.getHunkBlocks();
+			
+			for (Map.Entry<Long, HunkBlock> block : blocks.entrySet()) {
+				
+			}
+		} catch (HunkParseError e) {
+			log.appendException(e);
+			return;
+		}
+		
+	}
+	
+	private static void loadExecutable(Address imageBase, HunkBlockFile hbf, FlatProgramAPI fpa, Memory mem, MessageLog log) {
+		BinImage bi = BinFmtHunk.loadImage(hbf, log);
+		
 		if (bi == null) {
 			return;
 		}
 
 		Relocate rel = new Relocate(bi);
-		long[] addrs = rel
-				.getSeqAddresses((imageBase != null) ? imageBase.getOffset() : fpa.toAddr(DEF_IMAGE_BASE).getOffset());
-		List<byte[]> datas = rel.relocate(addrs);
+		long[] addrs = rel.getSeqAddresses((imageBase != null) ? imageBase.getOffset() : fpa.toAddr(DEF_IMAGE_BASE).getOffset());
+		List<byte[]> datas;
+		try {
+			datas = rel.relocate(addrs);
+		} catch (HunkParseError e1) {
+			log.appendException(e1);
+			return;
+		}
 
 		Address startAddr = fpa.toAddr(addrs[0]);
 		setFunction(fpa, startAddr, "start", log);
@@ -159,6 +203,7 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 						mem.setBytes(fpa.toAddr(segOffset + dataOffset), intToBytes((int) newAddr));
 					} catch (MemoryAccessException e) {
 						log.appendException(e);
+						return;
 					}
 				}
 			}
@@ -168,7 +213,7 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 
 		analyzeResident(mem, fpa, startAddr, log);
 		
-		addCustomTypes(program, log);
+		addCustomTypes(fpa.getCurrentProgram(), log);
 	}
 	
 	private static void addCustomTypes(Program program, MessageLog log) {
@@ -188,7 +233,7 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 		return buffer.array();
 	}
 
-	private void analyzeResident(Memory mem, FlatProgramAPI fpa, Address startAddr, MessageLog log) {
+	private static void analyzeResident(Memory mem, FlatProgramAPI fpa, Address startAddr, MessageLog log) {
 		Program program = fpa.getCurrentProgram();
 
 		try {

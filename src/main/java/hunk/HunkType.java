@@ -1,6 +1,6 @@
 package hunk;
 
-enum HunkType {
+public enum HunkType {
 	HUNK_BAD_TYPE(0xDEADBEEF),
 	
 	HUNK_UNIT(999),

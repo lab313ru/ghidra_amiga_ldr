@@ -6,17 +6,25 @@ import ghidra.app.util.bin.BinaryReader;
 
 class HunkNameBlock extends HunkBlock {
 	
-	HunkNameBlock() {
-		super(HunkType.HUNK_NAME);
+	private String name;
+	
+	HunkNameBlock(BinaryReader reader) throws HunkParseError {
+		super(HunkType.HUNK_NAME, reader);
+
+		parse();
+		calcHunkSize();
 	}
 
 	@Override
-	public void parse(BinaryReader reader) throws HunkParseError {
+	void parse() throws HunkParseError {
 		try {
-			HunkBlock.readName(reader);
+			name = HunkBlock.readName(reader);
 		} catch (IOException e) {
 			throw new HunkParseError(e);
 		}
 	}
 
+	public String getName() {
+		return name;
+	}
 }

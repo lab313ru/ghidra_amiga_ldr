@@ -6,12 +6,15 @@ import ghidra.app.util.bin.BinaryReader;
 
 class HunkOverlayBlock extends HunkBlock {
 	
-	HunkOverlayBlock() {
-		super(HunkType.HUNK_OVERLAY);
+	HunkOverlayBlock(BinaryReader reader) throws HunkParseError {
+		super(HunkType.HUNK_OVERLAY, reader);
+
+		parse();
+		calcHunkSize();
 	}
 
 	@Override
-	public void parse(BinaryReader reader) throws HunkParseError {
+	void parse() throws HunkParseError {
 		try {
 			int numLongs = reader.readNextInt();
 			reader.getPointerIndex();

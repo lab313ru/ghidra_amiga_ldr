@@ -1,6 +1,6 @@
 package hunk;
 
-enum HunkBlockType {
+public enum HunkBlockType {
 	TYPE_UNKNOWN,
 	TYPE_LOADSEG,
 	TYPE_UNIT,
