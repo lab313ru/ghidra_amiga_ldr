@@ -1,12 +1,8 @@
 package hunk;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-
-import com.google.common.io.Files;
 
 import ghidra.app.util.bin.BinaryReader;
 
@@ -38,7 +34,6 @@ public class HunkIndexBlock extends HunkBlock {
 			
 			int strtabSize = reader.readNextShort();
 			strtab = reader.readNextByteArray(strtabSize);
-			Files.write(strtab, new File("d:\\Sources\\ghidra_amiga_ldr-master\\samples\\MIAMINB.LIB_strtab"));
 			
 			numWords = numWords - (strtabSize / 2) - 1;
 			

@@ -21,8 +21,6 @@ class HunkHeaderBlock extends HunkBlock {
 	
 	@Override
 	void parse() throws HunkParseError {
-		long startOffset = reader.getPointerIndex();
-		
 		while (true) {
 			try {
 				String name = HunkBlock.readName(reader);
