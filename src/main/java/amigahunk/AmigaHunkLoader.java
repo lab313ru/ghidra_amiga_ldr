@@ -58,6 +58,8 @@ import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.Memory;
 import ghidra.program.model.mem.MemoryAccessException;
 import ghidra.program.model.mem.MemoryBlock;
+import ghidra.program.model.symbol.RefType;
+import ghidra.program.model.symbol.ReferenceManager;
 import ghidra.program.model.symbol.SourceType;
 import ghidra.program.model.util.CodeUnitInsertionException;
 import ghidra.util.exception.DuplicateNameException;
@@ -235,6 +237,7 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 
 	private static void analyzeResident(Memory mem, FlatProgramAPI fpa, Address startAddr, MessageLog log) {
 		Program program = fpa.getCurrentProgram();
+		ReferenceManager refMgr = program.getReferenceManager();
 
 		try {
 			while (true) {
@@ -269,8 +272,7 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 					long it_InitFunc = mem.getInt(rt_InitAddr.add(12));
 
 					Address it_InitFuncAddr = fpa.toAddr(it_InitFunc);
-					setFunction(fpa, it_InitFuncAddr, String.format("it_InitFunc_%06X", addr.getOffset()),
-							log);
+					setFunction(fpa, it_InitFuncAddr, String.format("it_InitFunc_%06X", addr.getOffset()), log);
 					Function func = fpa.getFunctionAt(it_InitFuncAddr);
 					func.setCustomVariableStorage(true);
 
@@ -311,72 +313,91 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 					int i = 0;
 					boolean askedForFd = false;
 					FdLibFunctions funcTable = null;
+					
+					boolean isRelative = (mem.getShort(it_FuncTableAddr) & 0xFFFF) == 0xFFFF;
 
 					while (true) {
-						long funcAddr = mem.getInt(it_FuncTableAddr.add(i * 4));
-
-						Address funcAddr_ = fpa.toAddr(funcAddr);
-						if (mem.contains(funcAddr_)) {
-							if (!askedForFd && i >= 4) {
-								TimeUnit.SECONDS.sleep(1);
-								if (OptionDialog.YES_OPTION == OptionDialog.showYesNoDialogWithNoAsDefaultButton(null,
-										"Question", String.format("Do you have *%s file for this library?", FdParser.LIB_FD_EXT))) {
-									String fdPath = showSelectFile("Select file...");
-									funcTable = FdParser.readFdFile(fdPath);
-								}
-								askedForFd = true;
-							}
-
-							DataUtilities.createData(program, it_FuncTableAddr.add(i * 4), PointerDataType.dataType, -1,
-									false, ClearDataMode.CLEAR_ALL_UNDEFINED_CONFLICT_DATA);
-
-							FdFunction funcDef = null;
-							if (funcTable != null) {
-								funcDef = funcTable.getFunctionByIndex(i - 4);
-							}
-
-							String name;
-
-							switch (i) {
-							case 0:
-								name = "LIB_OPEN";
+						long funcAddr;
+						
+						if (isRelative) {
+							short relVal = mem.getShort(it_FuncTableAddr.add((i + 1) * 2));
+							
+							if ((relVal & 0xFFFF) == 0xFFFF) {
 								break;
-							case 1:
-								name = "LIB_CLOSE";
-								break;
-							case 2:
-								name = "LIB_EXPUNGE";
-								break;
-							case 3:
-								name = "LIB_EXTFUNC";
-								break;
-							default:
-								name = funcDef != null ? funcDef.getName(false) : String.format("LibFunc_%03d", i - 4);
 							}
-
-							setFunction(fpa, funcAddr_, name, log);
-							func = fpa.getFunctionAt(funcAddr_);
-							func.setCustomVariableStorage(true);
-
-							params = new ArrayList<>();
-
-							params.add(new ParameterImpl("base", new PointerDataType(baseStruct), program.getRegister("A6"),
-									program));
-
-							if (funcDef != null) {
-								List<Map.Entry<String, String>> args = funcDef.getArgs();
-								for (Entry<String, String> arg : args) {
-									params.add(new ParameterImpl(arg.getKey(), PointerDataType.dataType,
-											program.getRegister(arg.getValue()), program));
-								}
-							}
-
-							func.updateFunction(null, null, FunctionUpdateType.CUSTOM_STORAGE, true,
-									SourceType.ANALYSIS, params.toArray(ParameterImpl[]::new));
-							i++;
+							
+							funcAddr = it_FuncTableAddr.add(relVal).getOffset();
 						} else {
+							funcAddr = mem.getInt(it_FuncTableAddr.add(i * 4));
+						}
+						
+						Address funcAddr_ = fpa.toAddr(funcAddr);
+						if (!mem.contains(funcAddr_)) {
 							break;
 						}
+
+						if (!askedForFd && i >= 4) {
+							TimeUnit.SECONDS.sleep(1);
+							if (OptionDialog.YES_OPTION == OptionDialog.showYesNoDialogWithNoAsDefaultButton(null,
+									"Question", String.format("Do you have *%s file for this library?", FdParser.LIB_FD_EXT))) {
+								String fdPath = showSelectFile("Select file...");
+								funcTable = FdParser.readFdFile(fdPath);
+							}
+							askedForFd = true;
+						}
+
+						if (isRelative) {
+							DataUtilities.createData(program, it_FuncTableAddr.add((i + 1) * 2), WordDataType.dataType, -1,
+									false, ClearDataMode.CLEAR_ALL_UNDEFINED_CONFLICT_DATA);
+							refMgr.addMemoryReference(it_FuncTableAddr.add((i + 1) * 2), funcAddr_, RefType.DATA, SourceType.ANALYSIS, 0);
+						} else {
+							DataUtilities.createData(program, it_FuncTableAddr.add(i * 4), PointerDataType.dataType, -1,
+									false, ClearDataMode.CLEAR_ALL_UNDEFINED_CONFLICT_DATA);
+						}
+
+						FdFunction funcDef = null;
+						if (funcTable != null) {
+							funcDef = funcTable.getFunctionByIndex(i - 4);
+						}
+
+						String name;
+
+						switch (i) {
+						case 0:
+							name = "LIB_OPEN";
+							break;
+						case 1:
+							name = "LIB_CLOSE";
+							break;
+						case 2:
+							name = "LIB_EXPUNGE";
+							break;
+						case 3:
+							name = "LIB_EXTFUNC";
+							break;
+						default:
+							name = funcDef != null ? funcDef.getName(false) : String.format("LibFunc_%03d", i - 4);
+						}
+
+						setFunction(fpa, funcAddr_, name, log);
+						func = fpa.getFunctionAt(funcAddr_);
+						func.setCustomVariableStorage(true);
+
+						params = new ArrayList<>();
+
+						params.add(new ParameterImpl("base", new PointerDataType(baseStruct), program.getRegister("A6"), program));
+
+						if (funcDef != null) {
+							List<Map.Entry<String, String>> args = funcDef.getArgs();
+							for (Entry<String, String> arg : args) {
+								params.add(new ParameterImpl(arg.getKey(), PointerDataType.dataType,
+										program.getRegister(arg.getValue()), program));
+							}
+						}
+
+						func.updateFunction(null, null, FunctionUpdateType.CUSTOM_STORAGE, true,
+								SourceType.ANALYSIS, params.toArray(ParameterImpl[]::new));
+						i++;
 					}
 				}
 			}
