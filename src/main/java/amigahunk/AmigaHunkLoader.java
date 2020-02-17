@@ -501,7 +501,7 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 				return "Invalid value for " + optName + " - " + option.getValue();
 			}
 		}
-		if (imageBase == null || (imageBase.getOffset() < 0x1000L) || (imageBase.getOffset() >= 0x700000L)) {
+		if (imageBase == null || (imageBase.getOffset() < 0x1000L) || (imageBase.getOffset() >= 0x80000000L)) {
 			return "Invalid image base";
 		}
 
