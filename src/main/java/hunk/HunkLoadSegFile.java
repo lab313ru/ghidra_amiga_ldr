@@ -28,17 +28,23 @@ class HunkLoadSegFile {
 			throw new HunkParseError("No hunk blocks found!");
 		}
 		
-		HunkHeaderBlock hdr = (HunkHeaderBlock) blocks.get(0L);
+		boolean isUnit = blocks.get(0L).getHunkType() == HunkType.HUNK_UNIT;
 		
-		if (hdr.getHunkType() != HunkType.HUNK_HEADER) {
-			throw new HunkParseError("No HEADER block found!");
+		HunkHeaderBlock hdr = null;
+		
+		if (!isUnit) {
+			hdr = (HunkHeaderBlock) blocks.get(0L);
+			
+			if (hdr.getHunkType() != HunkType.HUNK_HEADER) {
+				throw new HunkParseError("No HEADER block found!");
+			}
 		}
 
 		List<List<HunkBlock>> first = new ArrayList<>();
 		List<HunkBlock> current = null;
 		
 		for (HunkBlock block : blocks.values()) {
-			if (block instanceof HunkHeaderBlock) {
+			if ((block instanceof HunkHeaderBlock) || (isUnit && (block instanceof HunkUnitBlock))) {
 				continue;
 			}
 			
@@ -84,6 +90,7 @@ class HunkLoadSegFile {
 					if (block.isValidLoadsegBeginHunk()) {
 						newList = new ArrayList<>();
 						newList.add(block);
+						second.add(newList);
 					} else if (newList != null) {
 						newList.add(block);
 					} else {
@@ -93,22 +100,24 @@ class HunkLoadSegFile {
 			}
 		}
 		
-		if (hdr.getHunkTable().length != second.size()) {
+		if (!isUnit && hdr.getHunkTable().length != second.size()) {
 			throw new HunkParseError("Can't match hunks to header");
 		}
-		
+			
 		for (List<HunkBlock> l : second) {
 			HunkSegment seg = new HunkSegment();
 			seg.parse(l);
 			segments.add(seg);
 		}
 		
-		int n = second.size();
-		
-		for (int i = 0; i < n; ++i) {
-			HunkSegment seg = segments.get(i);
-			seg.setSizeLongs(hdr.getHunkTable()[i]);
-			segments.set(i, seg);
+		if (!isUnit) {
+			int n = second.size();
+			
+			for (int i = 0; i < n; ++i) {
+				HunkSegment seg = segments.get(i);
+				seg.setSizeLongs(hdr.getHunkTable()[i]);
+				segments.set(i, seg);
+			}
 		}
 	}
 }

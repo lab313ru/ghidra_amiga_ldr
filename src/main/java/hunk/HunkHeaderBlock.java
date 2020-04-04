@@ -8,19 +8,19 @@ import ghidra.app.util.bin.BinaryReader;
 
 class HunkHeaderBlock extends HunkBlock {
 
-	private final List<Integer> hunkTable;
+	private List<Integer> hunkTable;
 
-	HunkHeaderBlock(BinaryReader reader) throws HunkParseError {
+	HunkHeaderBlock(BinaryReader reader, boolean isExecutable) throws HunkParseError {
 		super(HunkType.HUNK_HEADER, reader);
 		
-		hunkTable = new ArrayList<>();
-		
-		parse();
-		calcHunkSize();
+		parse(reader, isExecutable);
+		calcHunkSize(reader);
 	}
 	
 	@Override
-	void parse() throws HunkParseError {
+	void parse(BinaryReader reader, boolean isExecutable) throws HunkParseError {
+		hunkTable = new ArrayList<>();
+		
 		while (true) {
 			try {
 				String name = HunkBlock.readName(reader);

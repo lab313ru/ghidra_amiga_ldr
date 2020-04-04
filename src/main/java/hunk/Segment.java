@@ -1,46 +1,52 @@
 package hunk;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 
 public class Segment {
 
 	private final SegmentType type;
 	private final int segSize;
 	private final byte[] data;
-	private final HashMap<Segment, Relocations> relocsList;
+	private final HashMap<Segment, List<Reloc>> relocsList;
 	private int id;
-	private HunkSegment fileData;
+	private HunkSegment segmentInfo;
 	
 	Segment(SegmentType type, int size, byte[] data) {
 		this.type = type;
 		this.segSize = size;
 		this.data = data;
-		fileData = null;
+		segmentInfo = null;
 		
 		relocsList = new HashMap<>();
 		
 		id = -1;
 	}
 	
-	public final SegmentType getType() {
+	public SegmentType getType() {
 		return type;
 	}
 
-	public final int getSize() {
+	public int getSize() {
 		return segSize;
 	}
 
-    final byte[] getData() {
+    byte[] getData() {
 		return data;
 	}
+    
+    public String getName() {
+    	return (segmentInfo == null) ? String.format("%s_%02d", type.toString(), id) : segmentInfo.getName();
+    }
 
-    void setFileData(HunkSegment seg) {
-		fileData = seg;
+    void setSegmentInfo(HunkSegment seg) {
+    	segmentInfo = seg;
 	}
 	
-	HunkSegment getFileData() {
-		return fileData;
+	HunkSegment getSegmentInfo() {
+		return segmentInfo;
 	}
 	
 	public int getId() {
@@ -51,16 +57,18 @@ public class Segment {
 		this.id = id;
 	}
 	
-	void addRelocation(Segment segment, Relocations relocs) {
-		this.relocsList.put(segment, relocs);
+	void addRelocations(Segment segment, final List<Reloc> relocs) {
+		relocsList.put(segment, relocs);
 	}
 	
 	public Segment[] getRelocationsToSegments() {
 		return new HashSet<>(relocsList.keySet()).toArray(Segment[]::new);
 	}
 	
-	public Relocations getRelocations(Segment toSeg) {
-		return relocsList.getOrDefault(toSeg, null);
+	public Reloc[] getRelocations(Segment toSeg) {
+		final List<Reloc> relocs = relocsList.getOrDefault(toSeg, new ArrayList<>());
+		
+		return relocs.toArray(Reloc[]::new);
 	}
 
 }

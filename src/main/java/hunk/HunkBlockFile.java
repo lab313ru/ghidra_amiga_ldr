@@ -9,8 +9,7 @@ import ghidra.app.util.bin.BinaryReader;
 public class HunkBlockFile {
 	private SortedMap<Long, HunkBlock> blocksList;
 	private HunkBlockType blockType;
-	private BinaryReader reader;
-	
+
 	public static boolean isHunkBlockFile(BinaryReader reader) {
 		HunkBlockFile hbf;
 		try {
@@ -24,20 +23,19 @@ public class HunkBlockFile {
 	public HunkBlockFile(BinaryReader reader) throws HunkParseError {
 		blocksList = new TreeMap<>();
 		blockType = peekType(reader);
-		this.reader = reader;
 	}
 	
 	public SortedMap<Long, HunkBlock> getHunkBlocks() {
 		return blocksList;
 	}
 	
-	public void load() throws HunkParseError {
+	public void load(BinaryReader reader, boolean isExecutable) throws HunkParseError {
 		try {
 			long pos = reader.getPointerIndex();
 			while (pos + 4 <= reader.length()) {
 				int tag = reader.readNextInt();
 
-				HunkBlock block = HunkBlock.fromHunkType(HunkType.fromInteger(tag & HunkType.HUNK_TYPE_MASK), reader);
+				HunkBlock block = HunkBlock.fromHunkType(HunkType.fromInteger(tag & HunkType.HUNK_TYPE_MASK), reader, isExecutable);
 				
 				if (block == null) {
 					throw new HunkParseError(String.format("Unsupported hunk type: %04d", tag & HunkType.HUNK_TYPE_MASK));
@@ -72,7 +70,7 @@ public class HunkBlockFile {
 	}
 	
 	private static HunkBlockType mapHunkTypeToHunkBlockType(HunkType blkId) {
-		if (blkId == HunkType.HUNK_HEADER) {
+		if ((blkId == HunkType.HUNK_HEADER) || blkId == HunkType.HUNK_UNIT) {
 			return HunkBlockType.TYPE_LOADSEG;
 		} else if (blkId == HunkType.HUNK_UNIT) {
 			return HunkBlockType.TYPE_UNIT;

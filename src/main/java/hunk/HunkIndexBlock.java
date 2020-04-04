@@ -11,14 +11,14 @@ public class HunkIndexBlock extends HunkBlock {
 	private List<HunkIndexUnitEntry> units;
 	private byte[] strtab;
 
-	HunkIndexBlock(BinaryReader reader) throws HunkParseError {
+	HunkIndexBlock(BinaryReader reader, boolean isExecutable) throws HunkParseError {
 		super(HunkType.HUNK_INDEX, reader);
 		
 		units = new ArrayList<>();
 		strtab = null;
 		
-		parse();
-		calcHunkSize();
+		parse(reader, isExecutable);
+		calcHunkSize(reader);
 	}
 	
 	private static String getStringFromOffset(byte[] array, int offset) {
@@ -28,7 +28,7 @@ public class HunkIndexBlock extends HunkBlock {
 	}
 
 	@Override
-	void parse() throws HunkParseError {
+	void parse(BinaryReader reader, boolean isExecutable) throws HunkParseError {
 		try {
 			int numWords = reader.readNextInt() * 2;
 			

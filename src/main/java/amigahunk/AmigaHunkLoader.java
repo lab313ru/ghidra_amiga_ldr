@@ -73,7 +73,6 @@ import hunk.HunkLibBlock;
 import hunk.HunkParseError;
 import hunk.Reloc;
 import hunk.Relocate;
-import hunk.Relocations;
 import hunk.Segment;
 import hunk.SegmentType;
 import structs.ExecLibrary;
@@ -187,15 +186,14 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 			boolean exec = seg.getType() == SegmentType.SEGMENT_TYPE_CODE;
 			boolean write = seg.getType() == SegmentType.SEGMENT_TYPE_DATA;
 
-			createSegment(segBytes, fpa, String.format("%s_%02d", seg.getType().toString(), seg.getId()), segOffset,
-					size, write, exec, log);
+			createSegment(segBytes, fpa, seg.getName(), segOffset, size, write, exec, log);
 
 			Segment[] toSegs = seg.getRelocationsToSegments();
 
 			for (Segment toSeg : toSegs) {
-				Relocations reloc = seg.getRelocations(toSeg);
+				Reloc[] reloc = seg.getRelocations(toSeg);
 
-				for (Reloc r : reloc.getRelocations()) {
+				for (Reloc r : reloc) {
 					int dataOffset = r.getOffset();
 
 					ByteBuffer buf = ByteBuffer.wrap(datas.get(seg.getId()));

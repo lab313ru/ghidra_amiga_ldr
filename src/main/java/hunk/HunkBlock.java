@@ -9,12 +9,10 @@ import ghidra.app.util.bin.BinaryReader;
 public abstract class HunkBlock {
 	private HunkType blkId;
 	protected long hunkSize;
-	protected BinaryReader reader;
 	protected long startPos;
 	
 	HunkBlock(HunkType blkId, BinaryReader reader) {
 		this.blkId = blkId;
-		this.reader = reader;
 		startPos = reader.getPointerIndex();
 		hunkSize = 0;
 	}
@@ -51,7 +49,7 @@ public abstract class HunkBlock {
 		case HUNK_CODE:
 		case HUNK_DATA:
 		case HUNK_BSS:
-		case HUNK_PPC_CODE:
+		// case HUNK_PPC_CODE:
 			return true;
 		default:
 			return false;
@@ -61,18 +59,26 @@ public abstract class HunkBlock {
 	boolean isValidLoadsegExtraHunk() {
 		switch (blkId) {
 		case HUNK_ABSRELOC32:
+		case HUNK_ABSRELOC16:
+		case HUNK_RELRELOC32:
+		case HUNK_RELRELOC26:
+		case HUNK_RELRELOC16:
+		case HUNK_RELRELOC8:
 		case HUNK_DREL32:
+		case HUNK_DREL16:
+		case HUNK_DREL8:
 		case HUNK_RELOC32SHORT:
 		case HUNK_DEBUG:
 		case HUNK_SYMBOL:
 		case HUNK_NAME:
+		case HUNK_EXT:
 			return true;
 		default:
 			return false;
 		}
 	}
 	
-	static HunkBlock fromHunkType(Object type, BinaryReader reader) throws HunkParseError {
+	static HunkBlock fromHunkType(Object type, BinaryReader reader, boolean isExecutable) throws HunkParseError {
 
 	    if (type == null) {
 	        return null;
@@ -80,48 +86,53 @@ public abstract class HunkBlock {
 
 		switch ((HunkType)type) {
 		case HUNK_HEADER:
-			return new HunkHeaderBlock(reader);
+			return new HunkHeaderBlock(reader, isExecutable);
 		case HUNK_CODE:
 		case HUNK_DATA:
 		case HUNK_BSS:
-			return new HunkSegmentBlock((HunkType)type, reader);
+			return new HunkSegmentBlock((HunkType)type, reader, isExecutable);
 		case HUNK_ABSRELOC32:
 		case HUNK_RELRELOC16:
 		case HUNK_RELRELOC8:
 		case HUNK_DREL16:
 		case HUNK_DREL8:
-			return new HunkRelocLongBlock((HunkType)type, reader);
+			return new HunkRelocLongBlock((HunkType)type, reader, isExecutable);
 		case HUNK_RELOC32SHORT:
+			return new HunkRelocWordBlock((HunkType)type, reader, isExecutable);
 		case HUNK_DREL32:
-			return new HunkRelocWordBlock((HunkType)type, reader);
+			if (isExecutable) {
+				return new HunkRelocWordBlock((HunkType)type, reader, isExecutable);
+			} else {
+				return new HunkRelocLongBlock((HunkType)type, reader, isExecutable);
+			}
 		case HUNK_END:
-			return new HunkEndBlock(reader);
+			return new HunkEndBlock(reader, isExecutable);
 		case HUNK_DEBUG:
-			return new HunkDebugBlock(reader);
+			return new HunkDebugBlock(reader, isExecutable);
 		case HUNK_SYMBOL:
-			return new HunkSymbolBlock(reader);
+			return new HunkSymbolBlock(reader, isExecutable);
 		case HUNK_OVERLAY:
-			return new HunkOverlayBlock(reader);
+			return new HunkOverlayBlock(reader, isExecutable);
 		case HUNK_BREAK:
-			return new HunkBreakBlock(reader);
+			return new HunkBreakBlock(reader, isExecutable);
 		case HUNK_UNIT:
-			return new HunkUnitBlock(reader);
+			return new HunkUnitBlock(reader, isExecutable);
 		case HUNK_NAME:
-			return new HunkNameBlock(reader);
+			return new HunkNameBlock(reader, isExecutable);
 		case HUNK_EXT:
-			return new HunkExtBlock(reader);
+			return new HunkExtBlock(reader, isExecutable);
 		case HUNK_LIB:
-			return new HunkLibBlock(reader);
+			return new HunkLibBlock(reader, isExecutable);
 		case HUNK_INDEX:
-			return new HunkIndexBlock(reader);
+			return new HunkIndexBlock(reader, isExecutable);
 		default:
 			return null;
 		}
 	}
 	
-	abstract void parse() throws HunkParseError;
+	abstract void parse(BinaryReader reader, boolean isExecutable) throws HunkParseError;
 	
-	protected void calcHunkSize() {
+	protected void calcHunkSize(BinaryReader reader) {
 		hunkSize += reader.getPointerIndex() - startPos;
 	}
 	

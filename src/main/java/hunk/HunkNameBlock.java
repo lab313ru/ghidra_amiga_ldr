@@ -4,19 +4,19 @@ import java.io.IOException;
 
 import ghidra.app.util.bin.BinaryReader;
 
-class HunkNameBlock extends HunkBlock {
+public class HunkNameBlock extends HunkBlock {
 	
 	private String name;
 	
-	HunkNameBlock(BinaryReader reader) throws HunkParseError {
+	HunkNameBlock(BinaryReader reader, boolean isExecutable) throws HunkParseError {
 		super(HunkType.HUNK_NAME, reader);
 
-		parse();
-		calcHunkSize();
+		parse(reader, isExecutable);
+		calcHunkSize(reader);
 	}
 
 	@Override
-	void parse() throws HunkParseError {
+	void parse(BinaryReader reader, boolean isExecutable) throws HunkParseError {
 		try {
 			name = HunkBlock.readName(reader);
 		} catch (IOException e) {

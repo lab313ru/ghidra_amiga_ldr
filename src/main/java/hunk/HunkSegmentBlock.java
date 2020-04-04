@@ -9,15 +9,15 @@ class HunkSegmentBlock extends HunkBlock {
 	private byte[] data = null;
 	private int sizeLongs = 0;
 	
-	HunkSegmentBlock(HunkType type, BinaryReader reader) throws HunkParseError {
+	HunkSegmentBlock(HunkType type, BinaryReader reader, boolean isExecutable) throws HunkParseError {
 		super(type, reader);
 
-		parse();
-		calcHunkSize();
+		parse(reader, isExecutable);
+		calcHunkSize(reader);
 	}
 	
 	@Override
-	void parse() throws HunkParseError {
+	void parse(BinaryReader reader, boolean isExecutable) throws HunkParseError {
 		try {
 			int size = sizeLongs = reader.readNextInt();
 			

@@ -7,7 +7,7 @@ class RelocData {
 	private final int hunkNum;
 	private final List<Integer> offsets;
 	
-	RelocData(int hunkNum, List<Integer> offsets) {
+	RelocData(int hunkNum, final List<Integer> offsets) {
 		this.hunkNum = hunkNum;
 		this.offsets = offsets;
 	}

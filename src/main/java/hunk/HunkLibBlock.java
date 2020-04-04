@@ -10,17 +10,17 @@ public class HunkLibBlock extends HunkBlock {
 	
 	private SortedMap<Long, HunkBlock> blocks;
 
-	public HunkLibBlock(BinaryReader reader) throws HunkParseError {
+	public HunkLibBlock(BinaryReader reader, boolean isExecutable) throws HunkParseError {
 		super(HunkType.HUNK_LIB, reader);
-
-		blocks = new TreeMap<>();
 		
-		parse();
-		calcHunkSize();
+		parse(reader, isExecutable);
+		calcHunkSize(reader);
 	}
 
 	@Override
-	void parse() throws HunkParseError {
+	void parse(BinaryReader reader, boolean isExecutable) throws HunkParseError {
+		blocks = new TreeMap<>();
+		
 		try {
 			int numLongs = reader.readNextInt();
 			long pos = reader.getPointerIndex();
@@ -29,7 +29,7 @@ public class HunkLibBlock extends HunkBlock {
 			while (pos < endPos && pos + 4 <= reader.length()) {
 				int tag = reader.readNextInt();
 				
-				HunkBlock block = HunkBlock.fromHunkType(HunkType.fromInteger(tag & HunkType.HUNK_TYPE_MASK), reader);
+				HunkBlock block = HunkBlock.fromHunkType(HunkType.fromInteger(tag & HunkType.HUNK_TYPE_MASK), reader, isExecutable);
 				
 				if (block == null) {
 					throw new HunkParseError(String.format("Unsupported hunk type: %04d", tag & HunkType.HUNK_TYPE_MASK));

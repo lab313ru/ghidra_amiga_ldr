@@ -8,14 +8,15 @@ public class HunkUnitBlock extends HunkBlock {
 	
 	private String name;
 	
-	HunkUnitBlock(BinaryReader reader) throws HunkParseError {
+	HunkUnitBlock(BinaryReader reader, boolean isExecutable) throws HunkParseError {
 		super(HunkType.HUNK_UNIT, reader);
-		parse();
-		calcHunkSize();
+		
+		parse(reader, isExecutable);
+		calcHunkSize(reader);
 	}
 
 	@Override
-	void parse() throws HunkParseError {
+	void parse(BinaryReader reader, boolean isExecutable) throws HunkParseError {
 		try {
 			name = HunkBlock.readName(reader);
 		} catch (IOException e) {

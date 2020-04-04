@@ -3,6 +3,7 @@ package amigahunk;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,7 @@ import hunk.HunkIndexSymbolDef;
 import hunk.HunkIndexSymbolRef;
 import hunk.HunkIndexUnitEntry;
 import hunk.HunkLibBlock;
+import hunk.HunkNameBlock;
 import hunk.HunkParseError;
 import hunk.HunkType;
 import hunk.HunkUnitBlock;
@@ -75,11 +77,14 @@ public class AmigaHunkLibFileSystem implements GFileSystem {
 			HunkBlockFile hbf = new HunkBlockFile(reader);
 			hbf.load();
 			
-			SortedMap<Long, HunkBlock> hunkBlocks = hbf.getHunkBlocks();
+			Iterator<Map.Entry<Long, HunkBlock>> hunkBlocks = hbf.getHunkBlocks().entrySet().iterator();
 			
 			String rootDir = "";
+			int index = 0;
 			
-			for (Map.Entry<Long, HunkBlock> block : hunkBlocks.entrySet()) {
+			while (hunkBlocks.hasNext()) {
+				Map.Entry<Long, HunkBlock> block = hunkBlocks.next();
+				
 				HunkBlock bb = block.getValue();
 				HunkType type = bb.getHunkType();
 				
@@ -90,9 +95,13 @@ public class AmigaHunkLibFileSystem implements GFileSystem {
 				
 				switch (type) {
 				case HUNK_UNIT: {
-					rootDir = item.name = ((HunkUnitBlock)bb).getName();
-					fsih.storeFile(item.name, fsih.getFileCount(), true, item.size, item);
+					index = 0;
+					Map.Entry<Long, HunkBlock> nameBlock = hunkBlocks.next();
+					HunkNameBlock name = (HunkNameBlock)nameBlock.getValue();
+					System.out.println(name.getName());
 				} break;
+				case HUNK_END:
+					continue;
 				case HUNK_LIB: {
 					SortedMap<Long, HunkBlock> libBlocks = ((HunkLibBlock)bb).getHunkBlocks();
 					
@@ -255,7 +264,7 @@ public class AmigaHunkLibFileSystem implements GFileSystem {
 			try {
 				HunkBlockFile hbf = new HunkBlockFile(reader);
 				HunkBlockType type = hbf.getHunkBlockType();
-				return (type == HunkBlockType.TYPE_LIB) || (type == HunkBlockType.TYPE_UNIT);
+				return (type == HunkBlockType.TYPE_LIB) /*|| (type == HunkBlockType.TYPE_UNIT)*/;
 			} catch (HunkParseError e) {
 				return false;
 			}

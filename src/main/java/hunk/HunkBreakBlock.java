@@ -4,14 +4,15 @@ import ghidra.app.util.bin.BinaryReader;
 
 class HunkBreakBlock extends HunkBlock {
 
-	public HunkBreakBlock(BinaryReader reader) throws HunkParseError {
+	public HunkBreakBlock(BinaryReader reader, boolean isExecutable) throws HunkParseError {
 		super(HunkType.HUNK_BREAK, reader);
-		parse();
-		calcHunkSize();
+		
+		parse(reader, isExecutable);
+		calcHunkSize(reader);
 	}
 
 	@Override
-	void parse() throws HunkParseError {
+	void parse(BinaryReader reader, boolean isExecutable) throws HunkParseError {
 		// TODO Auto-generated method stub
 	}
 }

@@ -73,9 +73,9 @@ public class Relocate {
 		Segment[] toSegs = seg.getRelocationsToSegments();
 		
 		for (Segment toSeg : toSegs) {
-			Relocations reloc = seg.getRelocations(toSeg);
+			Reloc[] relocs = seg.getRelocations(toSeg);
 			
-			for (Reloc r : reloc.getRelocations()) {
+			for (Reloc r : relocs) {
 				reloc(data, r, addrs[toSeg.getId()]);
 			}
 		}
