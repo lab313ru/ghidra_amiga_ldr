@@ -11,25 +11,20 @@ public class HunkBlockFile {
 	private HunkBlockType blockType;
 
 	public static boolean isHunkBlockFile(BinaryReader reader) {
-		HunkBlockFile hbf;
-		try {
-			hbf = new HunkBlockFile(reader);
-			return hbf.getHunkBlockType() != HunkBlockType.TYPE_UNKNOWN;
-		} catch (HunkParseError e) {
-			return false;
-		}
+		return peekType(reader) != HunkBlockType.TYPE_UNKNOWN;
 	}
 	
-	public HunkBlockFile(BinaryReader reader) throws HunkParseError {
+	public HunkBlockFile(BinaryReader reader, boolean isExecutable) throws HunkParseError {
 		blocksList = new TreeMap<>();
 		blockType = peekType(reader);
+		parse(reader, isExecutable);
 	}
 	
 	public SortedMap<Long, HunkBlock> getHunkBlocks() {
 		return blocksList;
 	}
 	
-	public void load(BinaryReader reader, boolean isExecutable) throws HunkParseError {
+	private void parse(BinaryReader reader, boolean isExecutable) throws HunkParseError {
 		try {
 			long pos = reader.getPointerIndex();
 			while (pos + 4 <= reader.length()) {
@@ -54,7 +49,7 @@ public class HunkBlockFile {
 		return blockType;
 	}
 	
-	private static HunkBlockType peekType(BinaryReader reader) {
+	public static HunkBlockType peekType(BinaryReader reader) {
 		long pos = reader.getPointerIndex();
 		
 		try {

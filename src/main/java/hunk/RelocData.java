@@ -5,24 +5,18 @@ import java.util.List;
 class RelocData {
 
 	private final int hunkNum;
-	private final List<Integer> offsets;
+	private final List<Reloc> relocs;
 	
-	RelocData(int hunkNum, final List<Integer> offsets) {
+	RelocData(int hunkNum, final List<Reloc> relocs) {
 		this.hunkNum = hunkNum;
-		this.offsets = offsets;
+		this.relocs = relocs;
 	}
 	
 	public final int getHunkNum() {
 		return hunkNum;
 	}
 	
-	public final int[] getOffsets() {
-		int[] res = new int[offsets.size()];
-		
-		for (int i = 0; i < res.length; ++i) {
-			res[i] = offsets.get(i);
-		}
-		
-		return res;
+	public final Reloc[] getRelocs() {
+		return relocs.toArray(Reloc[]::new);
 	}
 }

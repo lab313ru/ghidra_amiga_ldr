@@ -27,11 +27,11 @@ public class Relocate {
 		return sizes;
 	}
 	
-	public long[] getSeqAddresses(long baseAddr) {
+	public int[] getSeqAddresses(long baseAddr) {
 		int[] sizes = getSizes();
-		long[] addrs = new long[sizes.length];
+		int[] addrs = new int[sizes.length];
 		
-		long addr = baseAddr;
+		int addr = (int)baseAddr;
 		for (int i = 0; i < sizes.length; ++i) {
 			addrs[i] = addr;
 			addr += sizes[i];
@@ -40,7 +40,7 @@ public class Relocate {
 		return addrs;
 	}
 	
-	public List<byte[]> relocate(long[] addrs) throws HunkParseError {
+	public List<byte[]> relocate(int[] addrs) throws HunkParseError {
 		Segment[] segs = binImage.getSegments();
 		
 		if (segs.length != addrs.length) {
@@ -69,7 +69,7 @@ public class Relocate {
 		}
 	}
 
-	private static void relocData(byte[] data, Segment seg, long[] addrs) {
+	private static void relocData(byte[] data, Segment seg, int[] addrs) {
 		Segment[] toSegs = seg.getRelocationsToSegments();
 		
 		for (Segment toSeg : toSegs) {
@@ -81,11 +81,24 @@ public class Relocate {
 		}
 	}
 	
-	private static void reloc(byte[] data, Reloc reloc, long toAddr) {
+	private static void reloc(byte[] data, Reloc reloc, int toAddr) {
 		int offset = reloc.getOffset();
 		
 		ByteBuffer buf = ByteBuffer.wrap(data);
-		int delta = buf.getInt(offset) + reloc.getAddend();
-		buf.putInt(offset, (int)(toAddr + delta));
+		
+		switch (reloc.getWidth()) {
+		case 4: {
+			int delta = buf.getInt(offset) + reloc.getAddend();
+			buf.putInt(offset, (int)(toAddr + delta));
+		} break;
+		case 2: {
+			int delta = buf.getShort(offset) + reloc.getAddend();
+			buf.putShort(offset, (short)(toAddr + delta));
+		} break;
+		case 1: {
+			int delta = buf.get(offset) + reloc.getAddend();
+			buf.put(offset, (byte)(toAddr + delta));
+		} break;
+		}
 	}
 }

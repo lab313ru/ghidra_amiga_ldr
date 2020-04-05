@@ -10,9 +10,8 @@ import ghidra.app.util.bin.BinaryReader;
 
 class HunkExtBlock extends HunkBlock {
 	
-	private HashMap<String, Object> xdefsLocal; // Object can be Reloc or Integer
-	private HashMap<String, Object> xdefsGlobal; // Object can be Reloc or Integer
-	private HashMap<String, List<Object>> xrefs; // Object can be Reloc or Integer
+	private List<XDefinition> xdefs;
+	private List<XReference> xrefs;
 	
 	HunkExtBlock(BinaryReader reader, boolean isExecutable) throws HunkParseError {
 		super(HunkType.HUNK_EXT, reader);
@@ -23,9 +22,8 @@ class HunkExtBlock extends HunkBlock {
 
 	@Override
 	void parse(BinaryReader reader, boolean isExecutable) throws HunkParseError {
-		xdefsLocal = new HashMap<>();
-		xdefsGlobal = new HashMap<>();
-		xrefs = new HashMap<>();
+		xdefs = new ArrayList<>();
+		xrefs = new ArrayList<>();
 		
 		while (true) {
 			try {
@@ -41,27 +39,51 @@ class HunkExtBlock extends HunkBlock {
 
 				switch (extType) {
 				case EXT_SYMB: {
-					xdefsLocal.put(xname, new Reloc(reader.readNextInt()));
+					xdefs.add(new XDefinition(false, false, xname, reader.readNextInt()));
 				} break;
 				case EXT_DEF: {
-					xdefsGlobal.put(xname, new Reloc(reader.readNextInt()));
+					xdefs.add(new XDefinition(true, false, xname, reader.readNextInt()));
 				} break;
 				case EXT_ABS: {
-					xdefsGlobal.put(xname, reader.readNextInt());
+					xdefs.add(new XDefinition(true, true, xname, reader.readNextInt()));
 				} break;
 				
 				// Unresolved Symbol References
-				case EXT_ABSREF32: 
-				case EXT_ABSREF16: 
-				case EXT_ABSREF8:
-				case EXT_RELREF32: 
-				case EXT_RELREF16: 
-				case EXT_RELREF8: 
-				case EXT_DEXT32: 
-				case EXT_DEXT16:
+				case EXT_ABSREF32: {
+					final List<Integer> relocs = Arrays.asList(readRelocs(reader, extType));
+					xrefs.add(new XReference(xname, XReferenceType.R_ABS, relocs, 4));
+				} break;
+				case EXT_ABSREF16: {
+					final List<Integer> relocs = Arrays.asList(readRelocs(reader, extType));
+					xrefs.add(new XReference(xname, XReferenceType.R_ABS, relocs, 2));
+				} break;
+				case EXT_ABSREF8: {
+					final List<Integer> relocs = Arrays.asList(readRelocs(reader, extType));
+					xrefs.add(new XReference(xname, XReferenceType.R_ABS, relocs, 1));
+				} break;
+				case EXT_RELREF32: {
+					final List<Integer> relocs = Arrays.asList(readRelocs(reader, extType));
+					xrefs.add(new XReference(xname, XReferenceType.R_PC, relocs, 4));
+				} break;
+				case EXT_RELREF16: {
+					final List<Integer> relocs = Arrays.asList(readRelocs(reader, extType));
+					xrefs.add(new XReference(xname, XReferenceType.R_PC, relocs, 2));
+				} break;
+				case EXT_RELREF8: {
+					final List<Integer> relocs = Arrays.asList(readRelocs(reader, extType));
+					xrefs.add(new XReference(xname, XReferenceType.R_PC, relocs, 1));
+				} break;
+				case EXT_DEXT32: {
+					final List<Integer> relocs = Arrays.asList(readRelocs(reader, extType));
+					xrefs.add(new XReference(xname, XReferenceType.R_SD, relocs, 4));
+				} break;
+				case EXT_DEXT16: {
+					final List<Integer> relocs = Arrays.asList(readRelocs(reader, extType));
+					xrefs.add(new XReference(xname, XReferenceType.R_SD, relocs, 2));
+				} break;
 				case EXT_DEXT8: {
-					List<Object> relocs = Arrays.asList(readRelocs(reader, extType));
-					xrefs.put(xname, relocs);
+					final List<Integer> relocs = Arrays.asList(readRelocs(reader, extType));
+					xrefs.add(new XReference(xname, XReferenceType.R_SD, relocs, 1));
 				} break;
 				default: {
 					throw new HunkParseError(String.format("Unsupported HUNK_EXT type: %s", extType.name()));
@@ -73,20 +95,17 @@ class HunkExtBlock extends HunkBlock {
 		}
 	}
 	
-	final HashMap<String, Object> getLocalDefs() {
-		return xdefsLocal;
+	final List<XDefinition> getDefinitions() {
+		return xdefs;
 	}
 	
-	final HashMap<String, Object> getGlobalDefs() {
-		return xdefsGlobal;
-	}
-	
-	final HashMap<String, List<Object>> getXrefs() {
+	final List<XReference> getReferences() {
 		return xrefs;
 	}
 	
-	Object[] readRelocs(BinaryReader reader, ExtType extType) throws IOException {
-		List<Object> relocs = new ArrayList<>();
+	final Integer[] readRelocs(BinaryReader reader, ExtType extType) throws IOException {
+		System.out.println(extType.name());
+		List<Integer> relocs = new ArrayList<>();
 		
 		int numRefs = reader.readNextInt();
 		
@@ -96,26 +115,10 @@ class HunkExtBlock extends HunkBlock {
 		
 		for (int i = 0; i < numRefs; ++i) {
 			int reloc = reader.readNextInt();
-			
-			switch (extType) {
-			case EXT_ABSREF32: 
-			case EXT_ABSREF16: 
-			case EXT_ABSREF8: {
-				relocs.add(reloc);
-			} break;
-			case EXT_RELREF32: 
-			case EXT_RELREF16: 
-			case EXT_RELREF8: 
-			case EXT_DEXT32:
-			case EXT_DEXT16:
-			case EXT_DEXT8: {
-				relocs.add(new Reloc(reloc));
-			} break;
-			default: continue;
-			}
+			relocs.add(reloc);
 		}
 		
-		return relocs.toArray(Object[]::new);
+		return relocs.toArray(Integer[]::new);
 	}
 
 }

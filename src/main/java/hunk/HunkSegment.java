@@ -1,14 +1,13 @@
 package hunk;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 
 import ghidra.app.util.bin.BinaryReader;
 import ghidra.app.util.bin.ByteArrayProvider;
 import ghidra.app.util.bin.ByteProvider;
 
-class HunkSegment {
+public class HunkSegment {
 
 	private HunkSegmentBlock segBlock;
 	private HunkSymbolBlock symBlock;
@@ -56,16 +55,12 @@ class HunkSegment {
 		return name;
 	}
 	
-	final HashMap<String, Object> getExtLocalDefs() {
-		return extBlock.getLocalDefs();
+	public final List<XDefinition> getDefinitions() {
+		return (extBlock == null) ? null : extBlock.getDefinitions();
 	}
 	
-	final HashMap<String, Object> getExtGlobalDefs() {
-		return extBlock.getGlobalDefs();
-	}
-	
-	final HashMap<String, List<Object>> getExtXrefs() {
-		return extBlock.getXrefs();
+	public final List<XReference> getReferences() {
+		return (extBlock == null) ? null : extBlock.getReferences();
 	}
 
 	public void parse(List<HunkBlock> blocks) throws HunkParseError {

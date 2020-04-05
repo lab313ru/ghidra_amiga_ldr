@@ -1,5 +1,6 @@
 package hunk;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -55,16 +56,9 @@ public final class BinFmtHunk {
 		for (Segment seg : biSegs) {
 			HunkSegment hSeg = seg.getSegmentInfo();
 			HunkRelocBlock[] relocBlocks = hSeg.getRelocBlocks();
-			final HashMap<String, Object> extLocalDefs = hSeg.getExtLocalDefs();
-			final HashMap<String, Object> extGlobalDefs = hSeg.getExtGlobalDefs();
-			final HashMap<String, List<Object>> extXrefs = hSeg.getExtXrefs();
 			
 			if (relocBlocks != null) {
 				addHunkRelocs(relocBlocks, seg, biSegs);
-			}
-			
-			if (extLocalDefs != null) {
-				
 			}
 		}
 		
@@ -75,7 +69,7 @@ public final class BinFmtHunk {
 		for (HunkRelocBlock blk : relocBlocks) {
 			for (RelocData r : blk.getRelocs()) {
 				int hunkNum = r.getHunkNum();
-				int[] offsets = r.getOffsets();
+				Reloc[] offsets = r.getRelocs();
 				
 				if (hunkNum >= allSegs.length) {
 					throw new HunkParseError("Invalid hunk segment number");
@@ -83,18 +77,12 @@ public final class BinFmtHunk {
 				
 				Segment toSeg = allSegs[hunkNum];
 				
-				List<Reloc> rl = Arrays.asList(seg.getRelocations(toSeg));
-				
-				for (int o : offsets) {
-					rl.add(new Reloc(o));
-				}
+				List<Reloc> rl = new ArrayList<>();
+				rl.addAll(Arrays.asList(seg.getRelocations(toSeg)));
+				rl.addAll(Arrays.asList(offsets));
 				
 				seg.addRelocations(toSeg, rl);
 			}
 		}
-	}
-	
-	private static void addHunkDefs(final HashMap<String, Object> defs, Segment seg, Segment[] allSegs) {
-		
 	}
 }

@@ -38,14 +38,14 @@ public class Segment {
 	}
     
     public String getName() {
-    	return (segmentInfo == null) ? String.format("%s_%02d", type.toString(), id) : segmentInfo.getName();
+    	return ((segmentInfo == null) || (segmentInfo.getName() == null)) ? String.format("%s_%02d", type.toString(), id) : segmentInfo.getName();
     }
 
     void setSegmentInfo(HunkSegment seg) {
     	segmentInfo = seg;
 	}
 	
-	HunkSegment getSegmentInfo() {
+	public HunkSegment getSegmentInfo() {
 		return segmentInfo;
 	}
 	
@@ -70,5 +70,4 @@ public class Segment {
 		
 		return relocs.toArray(Reloc[]::new);
 	}
-
 }

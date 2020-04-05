@@ -8,8 +8,8 @@ import ghidra.app.util.bin.BinaryReader;
 
 class HunkRelocLongBlock extends HunkRelocBlock {
 	
-	public HunkRelocLongBlock(HunkType type, BinaryReader reader, boolean isExecutable) throws HunkParseError {
-		super(type, reader);
+	public HunkRelocLongBlock(HunkType type, BinaryReader reader, boolean isExecutable, int size) throws HunkParseError {
+		super(type, reader, size);
 
 		parse(reader, isExecutable);
 		calcHunkSize(reader);
@@ -27,13 +27,13 @@ class HunkRelocLongBlock extends HunkRelocBlock {
 				
 				int hunkNum = reader.readNextInt();
 				
-				List<Integer> offsets = new ArrayList<>();
+				List<Reloc> toAdd = new ArrayList<>();
 				
 				for (int i = 0; i < num; ++i) {
-					offsets.add(reader.readNextInt());
+					toAdd.add(new Reloc(reader.readNextInt(), size));
 				}
 				
-				relocs.add(new RelocData(hunkNum, offsets));
+				relocs.add(new RelocData(hunkNum, toAdd));
 			} catch (IOException e) {
 				throw new HunkParseError(e);
 			}

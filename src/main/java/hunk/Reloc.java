@@ -6,9 +6,9 @@ public class Reloc {
 	private final int width;
 	private final int addend;
 	
-	Reloc(int offset) {
+	Reloc(int offset, int width) {
 		this.offset = offset;
-		this.width = 4;
+		this.width = width;
 		this.addend = 0;
 	}
 

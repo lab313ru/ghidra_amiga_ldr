@@ -37,7 +37,6 @@ import hunk.HunkLibBlock;
 import hunk.HunkNameBlock;
 import hunk.HunkParseError;
 import hunk.HunkType;
-import hunk.HunkUnitBlock;
 
 @FileSystemInfo(
 		type = "amigahunklibfile",
@@ -74,8 +73,7 @@ public class AmigaHunkLibFileSystem implements GFileSystem {
 		BinaryReader reader = new BinaryReader(provider, false);
 		
 		try {
-			HunkBlockFile hbf = new HunkBlockFile(reader);
-			hbf.load();
+			HunkBlockFile hbf = new HunkBlockFile(reader, false);
 			
 			Iterator<Map.Entry<Long, HunkBlock>> hunkBlocks = hbf.getHunkBlocks().entrySet().iterator();
 			
@@ -260,14 +258,7 @@ public class AmigaHunkLibFileSystem implements GFileSystem {
 				throws IOException, CancelledException {
 
 			BinaryReader reader = new BinaryReader(byteProvider, false);
-			
-			try {
-				HunkBlockFile hbf = new HunkBlockFile(reader);
-				HunkBlockType type = hbf.getHunkBlockType();
-				return (type == HunkBlockType.TYPE_LIB) /*|| (type == HunkBlockType.TYPE_UNIT)*/;
-			} catch (HunkParseError e) {
-				return false;
-			}
+			return (HunkBlockFile.peekType(reader) == HunkBlockType.TYPE_LIB) /*|| (type == HunkBlockType.TYPE_UNIT)*/;
 		}
 	}
 

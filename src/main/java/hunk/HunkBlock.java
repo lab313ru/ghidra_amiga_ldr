@@ -92,19 +92,23 @@ public abstract class HunkBlock {
 		case HUNK_BSS:
 			return new HunkSegmentBlock((HunkType)type, reader, isExecutable);
 		case HUNK_ABSRELOC32:
+			return new HunkRelocLongBlock((HunkType)type, reader, isExecutable, 4);
 		case HUNK_RELRELOC16:
+			return new HunkRelocLongBlock((HunkType)type, reader, isExecutable, 2);
 		case HUNK_RELRELOC8:
-		case HUNK_DREL16:
-		case HUNK_DREL8:
-			return new HunkRelocLongBlock((HunkType)type, reader, isExecutable);
-		case HUNK_RELOC32SHORT:
-			return new HunkRelocWordBlock((HunkType)type, reader, isExecutable);
+			return new HunkRelocLongBlock((HunkType)type, reader, isExecutable, 1);
 		case HUNK_DREL32:
 			if (isExecutable) {
-				return new HunkRelocWordBlock((HunkType)type, reader, isExecutable);
+				return new HunkRelocWordBlock((HunkType)type, reader, isExecutable, 4);
 			} else {
-				return new HunkRelocLongBlock((HunkType)type, reader, isExecutable);
+				return new HunkRelocLongBlock((HunkType)type, reader, isExecutable, 4);
 			}
+		case HUNK_DREL16:
+			return new HunkRelocLongBlock((HunkType)type, reader, isExecutable, 2);
+		case HUNK_DREL8:
+			return new HunkRelocLongBlock((HunkType)type, reader, isExecutable, 1);
+		case HUNK_RELOC32SHORT:
+			return new HunkRelocWordBlock((HunkType)type, reader, isExecutable, 4);
 		case HUNK_END:
 			return new HunkEndBlock(reader, isExecutable);
 		case HUNK_DEBUG:

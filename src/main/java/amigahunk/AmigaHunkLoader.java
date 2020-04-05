@@ -61,20 +61,22 @@ import ghidra.program.model.mem.MemoryBlock;
 import ghidra.program.model.symbol.RefType;
 import ghidra.program.model.symbol.ReferenceManager;
 import ghidra.program.model.symbol.SourceType;
+import ghidra.program.model.symbol.SymbolTable;
 import ghidra.program.model.util.CodeUnitInsertionException;
 import ghidra.util.exception.DuplicateNameException;
 import ghidra.util.exception.InvalidInputException;
 import ghidra.util.task.TaskMonitor;
 import hunk.BinFmtHunk;
 import hunk.BinImage;
-import hunk.HunkBlock;
 import hunk.HunkBlockFile;
-import hunk.HunkLibBlock;
+import hunk.HunkBlockType;
 import hunk.HunkParseError;
 import hunk.Reloc;
 import hunk.Relocate;
 import hunk.Segment;
 import hunk.SegmentType;
+import hunk.XDefinition;
+import hunk.XReference;
 import structs.ExecLibrary;
 import structs.InitData_Type;
 import structs.InitTable;
@@ -119,12 +121,16 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 		Memory mem = program.getMemory();
 
 		BinaryReader reader = new BinaryReader(provider, false);
-		HunkBlockFile hbf = new HunkBlockFile(reader);
-		hbf.load();
+		HunkBlockType type = HunkBlockFile.peekType(reader);
+		HunkBlockFile hbf = new HunkBlockFile(reader, type == HunkBlockType.TYPE_LOADSEG);
 		
-		switch (hbf.getHunkBlockType()) {
+		switch (type) {
 		case TYPE_LOADSEG: {
-			loadExecutable(imageBase, hbf, fpa, mem, log);
+			try {
+				loadExecutable(imageBase, hbf, fpa, mem, log);
+			} catch (InvalidInputException e) {
+				log.appendException(e);
+			}
 		} break;
 		case TYPE_LIB: {
 			
@@ -137,23 +143,8 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 		} break;
 		}
 	}
-	
-	private static void loadLibrary(BinaryReader reader, MessageLog log) {
-		try {
-			HunkLibBlock hlb = new HunkLibBlock(reader);
-			SortedMap<Long, HunkBlock> blocks = hlb.getHunkBlocks();
-			
-			for (Map.Entry<Long, HunkBlock> block : blocks.entrySet()) {
-				
-			}
-		} catch (HunkParseError e) {
-			log.appendException(e);
-			return;
-		}
-		
-	}
-	
-	private static void loadExecutable(Address imageBase, HunkBlockFile hbf, FlatProgramAPI fpa, Memory mem, MessageLog log) {
+
+	private static void loadExecutable(Address imageBase, HunkBlockFile hbf, FlatProgramAPI fpa, Memory mem, MessageLog log) throws InvalidInputException {
 		BinImage bi = BinFmtHunk.loadImage(hbf, log);
 		
 		if (bi == null) {
@@ -161,7 +152,7 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 		}
 
 		Relocate rel = new Relocate(bi);
-		long[] addrs = rel.getSeqAddresses((imageBase != null) ? imageBase.getOffset() : fpa.toAddr(DEF_IMAGE_BASE).getOffset());
+		int[] addrs = rel.getSeqAddresses((imageBase != null) ? imageBase.getOffset() : fpa.toAddr(DEF_IMAGE_BASE).getOffset());
 		List<byte[]> datas;
 		try {
 			datas = rel.relocate(addrs);
@@ -169,9 +160,6 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 			log.appendException(e1);
 			return;
 		}
-
-		Address startAddr = fpa.toAddr(addrs[0]);
-		setFunction(fpa, startAddr, "start", log);
 
 		for (Segment seg : bi.getSegments()) {
 			long segOffset = addrs[seg.getId()];
@@ -187,33 +175,19 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 			boolean write = seg.getType() == SegmentType.SEGMENT_TYPE_DATA;
 
 			createSegment(segBytes, fpa, seg.getName(), segOffset, size, write, exec, log);
-
-			Segment[] toSegs = seg.getRelocationsToSegments();
-
-			for (Segment toSeg : toSegs) {
-				Reloc[] reloc = seg.getRelocations(toSeg);
-
-				for (Reloc r : reloc) {
-					int dataOffset = r.getOffset();
-
-					ByteBuffer buf = ByteBuffer.wrap(datas.get(seg.getId()));
-					long newAddr = buf.getInt(dataOffset) + r.getAddend();
-
-					try {
-						mem.setBytes(fpa.toAddr(segOffset + dataOffset), intToBytes((int) newAddr));
-					} catch (MemoryAccessException e) {
-						log.appendException(e);
-						return;
-					}
-				}
-			}
+			relocateSegment(seg, segOffset, datas, mem, fpa, log);
+			applySegmentDefs(seg, segOffset, fpa, fpa.getCurrentProgram().getSymbolTable());
 		}
+		
+		Address startAddr = fpa.toAddr(addrs[0]);
 		
 		createBaseSegment(fpa, log);
 
 		analyzeResident(mem, fpa, startAddr, log);
 		
 		addCustomTypes(fpa.getCurrentProgram(), log);
+		
+		setFunction(fpa, startAddr, "start", log);
 	}
 	
 	private static void addCustomTypes(Program program, MessageLog log) {
@@ -225,11 +199,84 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 			log.appendException(e);
 		}
 	}
+	
+	private static void relocateSegment(Segment seg, long segOffset, final List<byte[]> datas, Memory mem, FlatProgramAPI fpa, MessageLog log) {
+		Segment[] toSegs = seg.getRelocationsToSegments();
+
+		for (Segment toSeg : toSegs) {
+			Reloc[] reloc = seg.getRelocations(toSeg);
+
+			for (Reloc r : reloc) {
+				int dataOffset = r.getOffset();
+
+				ByteBuffer buf = ByteBuffer.wrap(datas.get(seg.getId()));
+				int newAddr = 0;
+				
+				try {
+					switch (r.getWidth()) {
+					case 4:
+						newAddr = buf.getInt(dataOffset) + r.getAddend();
+						mem.setBytes(fpa.toAddr(segOffset + dataOffset), intToBytes(newAddr));
+						break;
+					case 2:
+						newAddr = buf.getShort(dataOffset) + r.getAddend();
+						mem.setBytes(fpa.toAddr(segOffset + dataOffset), shortToBytes((short) newAddr));
+						break;
+					case 1:
+						newAddr = buf.get(dataOffset) + r.getAddend();
+						mem.setBytes(fpa.toAddr(segOffset + dataOffset), new byte[] {(byte) newAddr});
+						break;
+					}
+				} catch (MemoryAccessException e) {
+					log.appendException(e);
+					return;
+				}
+			}
+		}
+	}
+	
+	private static void applySegmentDefs(Segment seg, long segOffset, FlatProgramAPI fpa, SymbolTable st) throws InvalidInputException {
+		if (seg.getSegmentInfo().getDefinitions() == null) {
+			return;
+		}
+		
+		for (final XDefinition entry : seg.getSegmentInfo().getDefinitions()) {
+			if (entry.isAbsolute()) {
+				st.createLabel(fpa.toAddr(entry.getOffset()), entry.getName(), SourceType.USER_DEFINED);
+			} else {
+				st.createLabel(fpa.toAddr(segOffset + entry.getOffset()), entry.getName(), SourceType.USER_DEFINED);
+			}
+		}
+		
+		if (seg.getSegmentInfo().getReferences() == null) {
+			return;
+		}
+		
+		for (final XReference entry : seg.getSegmentInfo().getReferences()) {
+			switch (entry.getType()) {
+			case R_ABS: {
+				for (Integer offset : entry.getOffsets()) {
+					st.createLabel(fpa.toAddr(offset), entry.getName(), SourceType.USER_DEFINED);
+				}
+			} break;
+			default: {
+				System.out.println("TODO: add ref applying");
+			}
+			}
+		}
+	}
 
 	private static byte[] intToBytes(int x) {
 		ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES);
 		buffer.order(ByteOrder.BIG_ENDIAN);
 		buffer.putInt(x);
+		return buffer.array();
+	}
+	
+	private static byte[] shortToBytes(short x) {
+		ByteBuffer buffer = ByteBuffer.allocate(Short.BYTES);
+		buffer.order(ByteOrder.BIG_ENDIAN);
+		buffer.putShort(x);
 		return buffer.array();
 	}
 

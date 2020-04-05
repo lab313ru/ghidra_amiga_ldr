@@ -8,14 +8,17 @@ import ghidra.app.util.bin.BinaryReader;
 abstract class HunkRelocBlock extends HunkBlock {
 
 	final List<RelocData> relocs;
+	final int size;
 	
-	HunkRelocBlock(HunkType type, BinaryReader reader) {
+	HunkRelocBlock(HunkType type, BinaryReader reader, int size) {
 		super(type, reader);
-
+		System.out.println(type.name());
+		
 		this.relocs = new ArrayList<>();
+		this.size = size; 
 	}
 	
-	public RelocData[] getRelocs() {
+	protected RelocData[] getRelocs() {
 		return relocs.toArray(RelocData[]::new);
 	}
 }
