@@ -7,7 +7,6 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.SortedMap;
 
 import ghidra.app.util.bin.BinaryReader;
 import ghidra.app.util.bin.ByteProvider;
@@ -28,15 +27,10 @@ import ghidra.util.task.TaskMonitor;
 import hunk.HunkBlock;
 import hunk.HunkBlockFile;
 import hunk.HunkBlockType;
-import hunk.HunkIndexBlock;
-import hunk.HunkIndexHunkEntry;
-import hunk.HunkIndexSymbolDef;
-import hunk.HunkIndexSymbolRef;
-import hunk.HunkIndexUnitEntry;
-import hunk.HunkLibBlock;
 import hunk.HunkNameBlock;
 import hunk.HunkParseError;
 import hunk.HunkType;
+import hunk.HunkUnitBlock;
 
 @FileSystemInfo(
 		type = "amigahunklibfile",
@@ -75,90 +69,56 @@ public class AmigaHunkLibFileSystem implements GFileSystem {
 		try {
 			HunkBlockFile hbf = new HunkBlockFile(reader, false);
 			
-			Iterator<Map.Entry<Long, HunkBlock>> hunkBlocks = hbf.getHunkBlocks().entrySet().iterator();
+			Iterator<Map.Entry<Integer, HunkBlock>> hunkBlocks = hbf.getHunkBlocks().entrySet().iterator();
 			
-			String rootDir = "";
-			int index = 0;
+			String unitName = null, rsrvName = null;
+			int unitOffset = 0, rsrvOffset = -1;
+			int unitSize = 0;
 			
 			while (hunkBlocks.hasNext()) {
-				Map.Entry<Long, HunkBlock> block = hunkBlocks.next();
+				Map.Entry<Integer, HunkBlock> block = hunkBlocks.next();
 				
 				HunkBlock bb = block.getValue();
 				HunkType type = bb.getHunkType();
 				
-				LibHunkItem item = new LibHunkItem();
-				item.offset = block.getKey() + 4;
-				item.name = String.format("%03d_%s", fsih.getFileCount() + 1, bb.getHunkType());
-				item.size = bb.getSize();
+				System.out.println(String.format("%d - %s", fsih.getFileCount() + 1, type.name()));
 				
 				switch (type) {
 				case HUNK_UNIT: {
-					index = 0;
-					Map.Entry<Long, HunkBlock> nameBlock = hunkBlocks.next();
-					HunkNameBlock name = (HunkNameBlock)nameBlock.getValue();
-					System.out.println(name.getName());
+					unitOffset = block.getKey();
+					unitSize = bb.getSize();
+					unitName = ((HunkUnitBlock)bb).getName();
 				} break;
-				case HUNK_END:
-					continue;
-				case HUNK_LIB: {
-					SortedMap<Long, HunkBlock> libBlocks = ((HunkLibBlock)bb).getHunkBlocks();
+				case HUNK_NAME: {
+					if (unitName == null) {
+						unitSize = 0;
+						unitName = ((HunkNameBlock)bb).getName();
+						unitOffset = block.getKey();
+					}
 					
-					for (Map.Entry<Long, HunkBlock> libBlock : libBlocks.entrySet()) {
-						HunkBlock libB = libBlock.getValue();
-						
-						LibHunkItem libItem = new LibHunkItem();
-						libItem.name = String.format("%03d_%s", fsih.getFileCount() + 1, libB.getHunkType());
-						libItem.offset = libBlock.getKey() + 4;
-						libItem.size = libB.getSize();
+					unitSize += bb.getSize();
+				} break;
+				case HUNK_END: {
+					LibHunkItem item = new LibHunkItem();
+					
+					item.offset = (unitName != null) ? unitOffset : rsrvOffset;
+					item.name = (unitName != null) ? (!unitName.isEmpty() ? unitName : String.format("%04d", fsih.getFileCount() + 1)) : rsrvName;
+					item.size = unitSize + bb.getSize();
+					
+					fsih.storeFile(item.name, fsih.getFileCount(), false, item.size, item);
+					
+					unitSize = unitOffset = 0;
+					rsrvOffset = -1;
+					unitName = null;
+				} break;
+				default: {
+					if (rsrvOffset == -1) {
+						rsrvOffset = block.getKey();
+						rsrvName = String.format("%04d_%s", fsih.getFileCount() + 1, type.name());
+					}
 
-						fsih.storeFile(String.format("%s/%s", item.name, libItem.name), fsih.getFileCount(), false, libItem.size, libItem);
-					}
+					unitSize += bb.getSize();
 				} break;
-				case HUNK_INDEX: {
-					byte[] strtab = ((HunkIndexBlock)bb).getStrtab();
-					
-					HunkIndexUnitEntry[] units = ((HunkIndexBlock)bb).getHunkIndexUnitEntries();
-					
-					for (HunkIndexUnitEntry unit : units) {
-						System.out.println(String.format("Unit:\n\t%s - %d",
-								unit.getName(),
-								unit.getFirstHunkLongOff()
-								));
-						
-						//LibHunkItem libItem = new LibHunkItem();
-						
-						HunkIndexHunkEntry[] hunkEntries = unit.getHunkIndexHunkEntries();
-						
-						for (HunkIndexHunkEntry hunkEntry : hunkEntries) {
-							System.out.println(String.format("\tEntry:\n\t\t%s - %d - %d",
-									hunkEntry.getName(),
-									hunkEntry.getHunkLongs(),
-									hunkEntry.getHunkCtype()
-									));
-							
-							HunkIndexSymbolDef[] symDefs = hunkEntry.getSymDefs();
-							
-							for (HunkIndexSymbolDef symDef : symDefs) {
-								System.out.println(String.format("\t\tSymDef:\n\t\t\t%s - %d - %d",
-										symDef.getName(),
-										symDef.getValue(),
-										symDef.getSymCtype()
-										));
-							}
-							
-							HunkIndexSymbolRef[] symRefs = hunkEntry.getSymRefs();
-							
-							for (HunkIndexSymbolRef symRef : symRefs) {
-								System.out.println(String.format("\t\tSymRef:\n\t\t\t%s",
-										symRef.getName()
-										));
-							}
-						}
-					}
-				} break;
-				default:
-					fsih.storeFile(String.format("%s/%s", rootDir, item.name), fsih.getFileCount(), false, item.size, item);
-					break;
 				}
 			}
 			
@@ -258,7 +218,11 @@ public class AmigaHunkLibFileSystem implements GFileSystem {
 				throws IOException, CancelledException {
 
 			BinaryReader reader = new BinaryReader(byteProvider, false);
-			return (HunkBlockFile.peekType(reader) == HunkBlockType.TYPE_LIB) /*|| (type == HunkBlockType.TYPE_UNIT)*/;
+			HunkBlockType hbtFirst = HunkBlockFile.peekType(reader);
+			HunkBlockFile hbf = new HunkBlockFile(reader, hbtFirst == HunkBlockType.TYPE_LOADSEG);
+			
+			long unitsCount = hbf.getHunkBlocks().entrySet().stream().filter(e -> (e.getValue().getHunkType() == HunkType.HUNK_UNIT)).count();
+			return (hbtFirst == HunkBlockType.TYPE_UNIT && unitsCount > 1);
 		}
 	}
 

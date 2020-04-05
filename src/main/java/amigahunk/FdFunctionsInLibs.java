@@ -54,6 +54,10 @@ public class FdFunctionsInLibs {
 		}
 	}
 	
+	public int findLibIndex(String lib) {
+		return libsList.indexOf(lib);
+	}
+	
 	public FdFunction[] getLibsFunctionsByBias(List<String> filter, int bias) {
 		if (filter == null || filter.size() == 0) {
 			return funcsList.stream().filter(e -> e.getBias() == bias).toArray(FdFunction[]::new);

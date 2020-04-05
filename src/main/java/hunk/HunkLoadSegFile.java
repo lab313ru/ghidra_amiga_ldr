@@ -22,18 +22,18 @@ class HunkLoadSegFile {
 			return;
 		}
 		
-		SortedMap<Long, HunkBlock> blocks = bf.getHunkBlocks();
+		SortedMap<Integer, HunkBlock> blocks = bf.getHunkBlocks();
 		
 		if (blocks == null || blocks.isEmpty()) {
 			throw new HunkParseError("No hunk blocks found!");
 		}
 		
-		boolean isUnit = blocks.get(0L).getHunkType() == HunkType.HUNK_UNIT;
+		boolean isUnit = blocks.get(0).getHunkType() == HunkType.HUNK_UNIT;
 		
 		HunkHeaderBlock hdr = null;
 		
 		if (!isUnit) {
-			hdr = (HunkHeaderBlock) blocks.get(0L);
+			hdr = (HunkHeaderBlock) blocks.get(0);
 			
 			if (hdr.getHunkType() != HunkType.HUNK_HEADER) {
 				throw new HunkParseError("No HEADER block found!");

@@ -7,7 +7,7 @@ import java.util.TreeMap;
 import ghidra.app.util.bin.BinaryReader;
 
 public class HunkBlockFile {
-	private SortedMap<Long, HunkBlock> blocksList;
+	private SortedMap<Integer, HunkBlock> blocksList;
 	private HunkBlockType blockType;
 
 	public static boolean isHunkBlockFile(BinaryReader reader) {
@@ -20,7 +20,7 @@ public class HunkBlockFile {
 		parse(reader, isExecutable);
 	}
 	
-	public SortedMap<Long, HunkBlock> getHunkBlocks() {
+	public SortedMap<Integer, HunkBlock> getHunkBlocks() {
 		return blocksList;
 	}
 	
@@ -36,7 +36,7 @@ public class HunkBlockFile {
 					throw new HunkParseError(String.format("Unsupported hunk type: %04d", tag & HunkType.HUNK_TYPE_MASK));
 				}
 
-				blocksList.put(pos, block);
+				blocksList.put((int)pos, block);
 				
 				pos = reader.getPointerIndex();
 			}
@@ -65,7 +65,7 @@ public class HunkBlockFile {
 	}
 	
 	private static HunkBlockType mapHunkTypeToHunkBlockType(HunkType blkId) {
-		if ((blkId == HunkType.HUNK_HEADER) || blkId == HunkType.HUNK_UNIT) {
+		if (blkId == HunkType.HUNK_HEADER) {
 			return HunkBlockType.TYPE_LOADSEG;
 		} else if (blkId == HunkType.HUNK_UNIT) {
 			return HunkBlockType.TYPE_UNIT;

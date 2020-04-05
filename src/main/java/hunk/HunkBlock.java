@@ -8,12 +8,12 @@ import ghidra.app.util.bin.BinaryReader;
 
 public abstract class HunkBlock {
 	private HunkType blkId;
-	protected long hunkSize;
-	protected long startPos;
+	protected int hunkSize;
+	protected int startPos;
 	
 	HunkBlock(HunkType blkId, BinaryReader reader) {
 		this.blkId = blkId;
-		startPos = reader.getPointerIndex();
+		startPos = (int)reader.getPointerIndex();
 		hunkSize = 0;
 	}
 	
@@ -140,7 +140,7 @@ public abstract class HunkBlock {
 		hunkSize += reader.getPointerIndex() - startPos;
 	}
 	
-	public long getSize() {
+	public int getSize() {
 		return hunkSize;
 	}
 }

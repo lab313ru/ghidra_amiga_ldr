@@ -125,10 +125,14 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 		try {
 			String[] libs = funcsList.getLibsList(filter);
 			
-			int i = 1;
 			for (String lib : libs) {
+				int i = funcsList.findLibIndex(lib) + 1;
+				
+				if (i == 0) {
+					continue;
+				}
+				
 				createFunctionsSegment(fpa, lib, AmigaHunkLoader.getImageBase(imageBaseOffset) + i * 0x1000, funcsList.getFunctionTableByLib(lib), log);
-				i++;
 			}
 		} catch (InvalidInputException | DuplicateNameException | CodeUnitInsertionException e) {
 			log.appendException(e);

@@ -29,6 +29,7 @@ import javax.swing.JFileChooser;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
 import docking.widgets.OptionDialog;
+import ghidra.app.plugin.core.reloc.InstructionStasher;
 import ghidra.app.util.Option;
 import ghidra.app.util.OptionException;
 import ghidra.app.util.bin.BinaryReader;
@@ -38,11 +39,9 @@ import ghidra.app.util.opinion.AbstractLibrarySupportLoader;
 import ghidra.app.util.opinion.LoadSpec;
 import ghidra.app.util.opinion.Loader;
 import ghidra.framework.model.DomainObject;
-import ghidra.framework.store.LockException;
 import ghidra.program.flatapi.FlatProgramAPI;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressOutOfBoundsException;
-import ghidra.program.model.address.AddressOverflowException;
 import ghidra.program.model.data.DataTypeConflictHandler;
 import ghidra.program.model.data.DataUtilities;
 import ghidra.program.model.data.DataUtilities.ClearDataMode;
@@ -60,7 +59,6 @@ import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.Memory;
 import ghidra.program.model.mem.MemoryAccessException;
 import ghidra.program.model.mem.MemoryBlock;
-import ghidra.program.model.mem.MemoryConflictException;
 import ghidra.program.model.symbol.RefType;
 import ghidra.program.model.symbol.ReferenceManager;
 import ghidra.program.model.symbol.SourceType;
@@ -100,20 +98,9 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 
 	static final byte[] RTC_MATCHWORD = new byte[] { 0x4A, (byte) 0xFC };
 	static final byte RTF_AUTOINIT = (byte) (1 << 7);
-	
-	static final String sascLinkerDbName = "_LinkerDB";
+
 	static final String refsSegmName = "REFS";
 	static int refsLastIndex = 0;
-	
-	static final String[] sascNames = new String[] {
-			"_LinkerDB", "__BSSBAS", "__BSSLEN", "___ctors", "___dtors",
-			"_RESLEN", "_RESBASE", "_NEWDATAL"
-	};
-	
-	static enum sascNamesEnum {
-		SASPT, SASBB, SASBL, SASCT, SASDT,
-		SASRL, SASRB, SASDL
-	};
 
 	@Override
 	public String getName() {
@@ -147,17 +134,16 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 		HunkBlockFile hbf = new HunkBlockFile(reader, type == HunkBlockType.TYPE_LOADSEG);
 		
 		switch (type) {
-		case TYPE_LOADSEG: {
+		case TYPE_LOADSEG: 
+		case TYPE_UNIT: {
 			try {
-				loadExecutable(imageBase, hbf, fpa, mem, log);
-			} catch (InvalidInputException | MemoryAccessException | LockException | DuplicateNameException | MemoryConflictException | AddressOverflowException e) {
+				loadExecutable(imageBase, type == HunkBlockType.TYPE_LOADSEG, hbf, fpa, mem, log);
+			} catch (Throwable e) {
+				e.printStackTrace();
 				log.appendException(e);
 			}
 		} break;
 		case TYPE_LIB: {
-			
-		} break;
-		case TYPE_UNIT: {
 			
 		} break;
 		default: {
@@ -166,7 +152,7 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 		}
 	}
 
-	private static void loadExecutable(Address imageBase, HunkBlockFile hbf, FlatProgramAPI fpa, Memory mem, MessageLog log) throws InvalidInputException, MemoryAccessException, LockException, DuplicateNameException, MemoryConflictException, AddressOverflowException {
+	private static void loadExecutable(Address imageBase, boolean isExecutable, HunkBlockFile hbf, FlatProgramAPI fpa, Memory mem, MessageLog log) throws Throwable {
 		BinImage bi = BinFmtHunk.loadImage(hbf, log);
 		
 		if (bi == null) {
@@ -211,7 +197,7 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 		for (Segment seg : bi.getSegments()) {
 			int segOffset = addrs[seg.getId()];
 
-			applySegmentDefs(seg, segOffset, fpa, fpa.getCurrentProgram().getSymbolTable(), lastSectAddress);
+			applySegmentDefs(seg, segOffset, fpa, fpa.getCurrentProgram().getSymbolTable(), log, lastSectAddress);
 		}
 		
 		Address startAddr = fpa.toAddr(addrs[0]);
@@ -222,7 +208,9 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 		
 		addCustomTypes(fpa.getCurrentProgram(), log);
 		
-		setFunction(fpa, startAddr, "start", log);
+		if (isExecutable) {
+			setFunction(fpa, startAddr, "start", log);
+		}
 	}
 	
 	private static void addCustomTypes(Program program, MessageLog log) {
@@ -260,7 +248,7 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 						break;
 					}
 					patchReference(mem, fpa.toAddr(segOffset + dataOffset), newAddr, r.getWidth());
-				} catch (MemoryAccessException e) {
+				} catch (MemoryAccessException | CodeUnitInsertionException e) {
 					log.appendException(e);
 					return;
 				}
@@ -268,16 +256,22 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 		}
 	}
 	
-	private static void applySegmentDefs(Segment seg, int segOffset, FlatProgramAPI fpa, SymbolTable st, int lastSectAddress) throws InvalidInputException, MemoryAccessException, LockException, DuplicateNameException, MemoryConflictException, AddressOverflowException {
+	private static void applySegmentDefs(Segment seg, int segOffset, FlatProgramAPI fpa, SymbolTable st, MessageLog log, int lastSectAddress) throws Throwable {
 		if (seg.getSegmentInfo().getDefinitions() == null) {
 			return;
 		}
 		
 		for (final XDefinition entry : seg.getSegmentInfo().getDefinitions()) {
-			if (entry.isAbsolute()) {
-				st.createLabel(fpa.toAddr(entry.getOffset()), entry.getName(), SourceType.USER_DEFINED);
-			} else {
-				st.createLabel(fpa.toAddr(segOffset + entry.getOffset()), entry.getName(), SourceType.USER_DEFINED);
+			Address defAddr = fpa.toAddr(entry.getOffset());
+			
+			if (!entry.isAbsolute()) {
+				defAddr = fpa.toAddr(segOffset + entry.getOffset());
+			}
+			
+			st.createLabel(defAddr, entry.getName(), SourceType.USER_DEFINED);
+			
+			if (entry.getName().equals("___startup")) {
+				setFunction(fpa, defAddr, entry.getName(), log);
 			}
 		}
 		
@@ -311,7 +305,8 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 		}
 	}
 	
-	private static void patchReference(Memory mem, Address fromAddr, int toAddr, int width) throws MemoryAccessException {
+	private static void patchReference(Memory mem, Address fromAddr, int toAddr, int width) throws MemoryAccessException, CodeUnitInsertionException {
+		InstructionStasher instructionStasher = new InstructionStasher(mem.getProgram(), fromAddr);
 		switch (width) {
 		case 4:
 			mem.setBytes(fromAddr, intToBytes(toAddr));
@@ -323,9 +318,10 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 			mem.setBytes(fromAddr, new byte[] {(byte) toAddr});
 			break;
 		}
+		instructionStasher.restore();
 	}
 
-	private static int addReference(Memory mem, FlatProgramAPI fpa, SymbolTable st, String name, int lastSectAddress) throws LockException, DuplicateNameException, MemoryConflictException, AddressOverflowException, InvalidInputException {
+	private static int addReference(Memory mem, FlatProgramAPI fpa, SymbolTable st, String name, int lastSectAddress) throws Throwable {
 		MemoryBlock block = mem.getBlock(refsSegmName);
 		
 		if (block == null) {

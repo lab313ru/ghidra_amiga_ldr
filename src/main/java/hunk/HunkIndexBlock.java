@@ -1,5 +1,6 @@
 package hunk;
 
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,15 +35,21 @@ public class HunkIndexBlock extends HunkBlock {
 			
 			int strtabSize = reader.readNextShort();
 			strtab = reader.readNextByteArray(strtabSize);
+			// strtab = Arrays.copyOfRange(strtab, 1, strtab.length);
+			FileOutputStream fo = new FileOutputStream("d:\\AmiKitXE\\AmiKit\\Work\\sc\\lib\\memwatch.lib_strtab.bin");
+			fo.write(strtab);
+			fo.close();
 			
 			numWords = numWords - (strtabSize / 2) - 1;
 			
 			while (numWords > 1) {
 				short nameOff = reader.readNextShort();
 				short firstHunkLongOff = reader.readNextShort();
-				short numHunks = (short) (reader.readNextShort() - 3);
+				short numHunks = reader.readNextShort();
+				numWords -= 3;
 				
 				String name = getStringFromOffset(strtab, nameOff);
+				System.out.println(String.format("%s - %d", name, nameOff));
 				
 				HunkIndexUnitEntry unitEntry = new HunkIndexUnitEntry(name, firstHunkLongOff);
 				units.add(unitEntry);
@@ -53,6 +60,7 @@ public class HunkIndexBlock extends HunkBlock {
 					short hunkCtype = reader.readNextShort();
 					
 					name = getStringFromOffset(strtab, nameOff);
+					System.out.println(String.format("%s - %d", name, nameOff));
 					
 					HunkIndexHunkEntry hunkEntry = new HunkIndexHunkEntry(name, hunkLongs, hunkCtype);
 					unitEntry.addIndexHunk(hunkEntry);
@@ -61,14 +69,17 @@ public class HunkIndexBlock extends HunkBlock {
 					
 					for (int j = 0; j < numRefs; ++j) {
 						nameOff = reader.readNextShort();
+						name = getStringFromOffset(strtab, nameOff);
+						int width = 4;
 						
-						if (nameOff < strtab.length) {
-							name = getStringFromOffset(strtab, nameOff);
-						} else {
-							name = "";
+						if (name.isEmpty()) {
+							name = getStringFromOffset(strtab, nameOff + 1);
+							width = 2;
 						}
 						
-						hunkEntry.addSymRef(new HunkIndexSymbolRef(name));
+						hunkEntry.addSymRef(new HunkIndexSymbolRef(name, width));
+						
+						System.out.println(String.format("%s - %d", name, nameOff));
 					}
 					
 					short numDefs = reader.readNextShort();
@@ -79,6 +90,7 @@ public class HunkIndexBlock extends HunkBlock {
 						short stype = reader.readNextShort();
 						
 						name = getStringFromOffset(strtab, nameOff);
+						System.out.println(String.format("%s - %d", name, nameOff));
 						
 						hunkEntry.addSymDef(new HunkIndexSymbolDef(name, value, stype));
 					}
