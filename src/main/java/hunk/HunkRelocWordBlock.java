@@ -34,7 +34,7 @@ class HunkRelocWordBlock extends HunkRelocBlock {
 				List<Reloc> toAdd = new ArrayList<>();
 				
 				for (int i = 0; i < numOffs; ++i) {
-					toAdd.add(new Reloc((int) reader.readNextShort(), size));
+					toAdd.add(new Reloc(reader.readNextShort(), size));
 				}
 				
 				relocs.add(new RelocData(hunkNum, toAdd));

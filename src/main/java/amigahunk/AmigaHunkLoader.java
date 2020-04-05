@@ -38,9 +38,11 @@ import ghidra.app.util.opinion.AbstractLibrarySupportLoader;
 import ghidra.app.util.opinion.LoadSpec;
 import ghidra.app.util.opinion.Loader;
 import ghidra.framework.model.DomainObject;
+import ghidra.framework.store.LockException;
 import ghidra.program.flatapi.FlatProgramAPI;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressOutOfBoundsException;
+import ghidra.program.model.address.AddressOverflowException;
 import ghidra.program.model.data.DataTypeConflictHandler;
 import ghidra.program.model.data.DataUtilities;
 import ghidra.program.model.data.DataUtilities.ClearDataMode;
@@ -58,9 +60,11 @@ import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.Memory;
 import ghidra.program.model.mem.MemoryAccessException;
 import ghidra.program.model.mem.MemoryBlock;
+import ghidra.program.model.mem.MemoryConflictException;
 import ghidra.program.model.symbol.RefType;
 import ghidra.program.model.symbol.ReferenceManager;
 import ghidra.program.model.symbol.SourceType;
+import ghidra.program.model.symbol.Symbol;
 import ghidra.program.model.symbol.SymbolTable;
 import ghidra.program.model.util.CodeUnitInsertionException;
 import ghidra.util.exception.DuplicateNameException;
@@ -89,18 +93,36 @@ import structs.WBStartup;
 public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 
 	static final String AMIGA_HUNK = "Amiga Executable Hunks loader";
-	static final int DEF_IMAGE_BASE = 0x21F000;
+	public static final int DEF_IMAGE_BASE = 0x21F000;
 
 	static final String OPTION_NAME = "ImageBase";
-	Address imageBase = null;
+	public static Address imageBase = null;
 
 	static final byte[] RTC_MATCHWORD = new byte[] { 0x4A, (byte) 0xFC };
 	static final byte RTF_AUTOINIT = (byte) (1 << 7);
+	
+	static final String sascLinkerDbName = "_LinkerDB";
+	static final String refsSegmName = "REFS";
+	static int refsLastIndex = 0;
+	
+	static final String[] sascNames = new String[] {
+			"_LinkerDB", "__BSSBAS", "__BSSLEN", "___ctors", "___dtors",
+			"_RESLEN", "_RESBASE", "_NEWDATAL"
+	};
+	
+	static enum sascNamesEnum {
+		SASPT, SASBB, SASBL, SASCT, SASDT,
+		SASRL, SASRB, SASDL
+	};
 
 	@Override
 	public String getName() {
 
 		return AMIGA_HUNK;
+	}
+	
+	public static int getImageBase(int offset) {
+		return (int) (((imageBase != null) ? imageBase.getOffset() : DEF_IMAGE_BASE) + offset);
 	}
 
 	@Override
@@ -128,7 +150,7 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 		case TYPE_LOADSEG: {
 			try {
 				loadExecutable(imageBase, hbf, fpa, mem, log);
-			} catch (InvalidInputException e) {
+			} catch (InvalidInputException | MemoryAccessException | LockException | DuplicateNameException | MemoryConflictException | AddressOverflowException e) {
 				log.appendException(e);
 			}
 		} break;
@@ -144,15 +166,17 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 		}
 	}
 
-	private static void loadExecutable(Address imageBase, HunkBlockFile hbf, FlatProgramAPI fpa, Memory mem, MessageLog log) throws InvalidInputException {
+	private static void loadExecutable(Address imageBase, HunkBlockFile hbf, FlatProgramAPI fpa, Memory mem, MessageLog log) throws InvalidInputException, MemoryAccessException, LockException, DuplicateNameException, MemoryConflictException, AddressOverflowException {
 		BinImage bi = BinFmtHunk.loadImage(hbf, log);
 		
 		if (bi == null) {
 			return;
 		}
+		
+		int _imageBase = getImageBase(0);
 
 		Relocate rel = new Relocate(bi);
-		int[] addrs = rel.getSeqAddresses((imageBase != null) ? imageBase.getOffset() : fpa.toAddr(DEF_IMAGE_BASE).getOffset());
+		int[] addrs = rel.getSeqAddresses(_imageBase);
 		List<byte[]> datas;
 		try {
 			datas = rel.relocate(addrs);
@@ -160,10 +184,16 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 			log.appendException(e1);
 			return;
 		}
+		
+		int lastSectAddress = 0;
 
 		for (Segment seg : bi.getSegments()) {
-			long segOffset = addrs[seg.getId()];
+			int segOffset = addrs[seg.getId()];
 			int size = seg.getSize();
+			
+			if (segOffset + size > lastSectAddress) {
+				lastSectAddress = segOffset + size;
+			}
 
 			ByteArrayInputStream segBytes = new ByteArrayInputStream(datas.get(seg.getId()));
 
@@ -176,7 +206,12 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 
 			createSegment(segBytes, fpa, seg.getName(), segOffset, size, write, exec, log);
 			relocateSegment(seg, segOffset, datas, mem, fpa, log);
-			applySegmentDefs(seg, segOffset, fpa, fpa.getCurrentProgram().getSymbolTable());
+		}
+		
+		for (Segment seg : bi.getSegments()) {
+			int segOffset = addrs[seg.getId()];
+
+			applySegmentDefs(seg, segOffset, fpa, fpa.getCurrentProgram().getSymbolTable(), lastSectAddress);
 		}
 		
 		Address startAddr = fpa.toAddr(addrs[0]);
@@ -200,7 +235,7 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 		}
 	}
 	
-	private static void relocateSegment(Segment seg, long segOffset, final List<byte[]> datas, Memory mem, FlatProgramAPI fpa, MessageLog log) {
+	private static void relocateSegment(Segment seg, int segOffset, final List<byte[]> datas, Memory mem, FlatProgramAPI fpa, MessageLog log) {
 		Segment[] toSegs = seg.getRelocationsToSegments();
 
 		for (Segment toSeg : toSegs) {
@@ -216,17 +251,15 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 					switch (r.getWidth()) {
 					case 4:
 						newAddr = buf.getInt(dataOffset) + r.getAddend();
-						mem.setBytes(fpa.toAddr(segOffset + dataOffset), intToBytes(newAddr));
 						break;
 					case 2:
 						newAddr = buf.getShort(dataOffset) + r.getAddend();
-						mem.setBytes(fpa.toAddr(segOffset + dataOffset), shortToBytes((short) newAddr));
 						break;
 					case 1:
 						newAddr = buf.get(dataOffset) + r.getAddend();
-						mem.setBytes(fpa.toAddr(segOffset + dataOffset), new byte[] {(byte) newAddr});
 						break;
 					}
+					patchReference(mem, fpa.toAddr(segOffset + dataOffset), newAddr, r.getWidth());
 				} catch (MemoryAccessException e) {
 					log.appendException(e);
 					return;
@@ -235,7 +268,7 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 		}
 	}
 	
-	private static void applySegmentDefs(Segment seg, long segOffset, FlatProgramAPI fpa, SymbolTable st) throws InvalidInputException {
+	private static void applySegmentDefs(Segment seg, int segOffset, FlatProgramAPI fpa, SymbolTable st, int lastSectAddress) throws InvalidInputException, MemoryAccessException, LockException, DuplicateNameException, MemoryConflictException, AddressOverflowException {
 		if (seg.getSegmentInfo().getDefinitions() == null) {
 			return;
 		}
@@ -251,19 +284,64 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 		if (seg.getSegmentInfo().getReferences() == null) {
 			return;
 		}
+
+		Memory mem = fpa.getCurrentProgram().getMemory();
 		
 		for (final XReference entry : seg.getSegmentInfo().getReferences()) {
-			switch (entry.getType()) {
-			case R_ABS: {
-				for (Integer offset : entry.getOffsets()) {
-					st.createLabel(fpa.toAddr(offset), entry.getName(), SourceType.USER_DEFINED);
+			for (Integer offset : entry.getOffsets()) {
+				Address fromAddr = fpa.toAddr(segOffset + offset);
+				int newAddr = 0;
+				
+				switch (entry.getType()) {
+				case R_ABS: {
+					newAddr = addReference(mem, fpa, st, entry.getName(), lastSectAddress);
+					patchReference(mem, fromAddr, newAddr, entry.getWidth());
+				} break;
+				case R_SD: {
+					newAddr = addReference(mem, fpa, st, entry.getName(), lastSectAddress);
+					patchReference(mem, fromAddr, (int) (newAddr - lastSectAddress), entry.getWidth());
+				} break;
+				case R_PC: {
+					newAddr = addReference(mem, fpa, st, entry.getName(), lastSectAddress);
+					patchReference(mem, fromAddr, (int) (newAddr - fromAddr.getOffset()), entry.getWidth());
+				} break;
 				}
-			} break;
-			default: {
-				System.out.println("TODO: add ref applying");
-			}
+				
 			}
 		}
+	}
+	
+	private static void patchReference(Memory mem, Address fromAddr, int toAddr, int width) throws MemoryAccessException {
+		switch (width) {
+		case 4:
+			mem.setBytes(fromAddr, intToBytes(toAddr));
+			break;
+		case 2:
+			mem.setBytes(fromAddr, shortToBytes((short) toAddr));
+			break;
+		case 1:
+			mem.setBytes(fromAddr, new byte[] {(byte) toAddr});
+			break;
+		}
+	}
+
+	private static int addReference(Memory mem, FlatProgramAPI fpa, SymbolTable st, String name, int lastSectAddress) throws LockException, DuplicateNameException, MemoryConflictException, AddressOverflowException, InvalidInputException {
+		MemoryBlock block = mem.getBlock(refsSegmName);
+		
+		if (block == null) {
+			block = mem.createUninitializedBlock(refsSegmName, fpa.toAddr(lastSectAddress), 0x1000L, false);
+		}
+		
+		List<Symbol> syms = st.getGlobalSymbols(name);
+		if (syms.size() > 0) {
+			return (int) syms.get(0).getAddress().getOffset();
+		}
+		
+		Address newAddress = block.getStart().add(refsLastIndex * 4);
+		st.createLabel(newAddress, name, SourceType.IMPORTED);
+		refsLastIndex++;
+		
+		return (int) newAddress.getOffset();
 	}
 
 	private static byte[] intToBytes(int x) {

@@ -12,8 +12,7 @@ abstract class HunkRelocBlock extends HunkBlock {
 	
 	HunkRelocBlock(HunkType type, BinaryReader reader, int size) {
 		super(type, reader);
-		System.out.println(type.name());
-		
+
 		this.relocs = new ArrayList<>();
 		this.size = size; 
 	}

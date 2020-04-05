@@ -81,7 +81,7 @@ public class Relocate {
 		}
 	}
 	
-	private static void reloc(byte[] data, Reloc reloc, int toAddr) {
+	private static void reloc(byte[] data, Reloc reloc, int sectAddr) {
 		int offset = reloc.getOffset();
 		
 		ByteBuffer buf = ByteBuffer.wrap(data);
@@ -89,15 +89,17 @@ public class Relocate {
 		switch (reloc.getWidth()) {
 		case 4: {
 			int delta = buf.getInt(offset) + reloc.getAddend();
-			buf.putInt(offset, (int)(toAddr + delta));
+			buf.putInt(offset, (int)(sectAddr + delta));
 		} break;
 		case 2: {
-			int delta = buf.getShort(offset) + reloc.getAddend();
-			buf.putShort(offset, (short)(toAddr + delta));
+			System.out.println(String.format("Word reloc at 0x%08X, delta: %d", offset, buf.getShort(offset)));
+			// int delta = buf.getShort(offset) + reloc.getAddend();
+			// buf.putShort(offset, (short)(sectAddr + delta - offset));
 		} break;
 		case 1: {
-			int delta = buf.get(offset) + reloc.getAddend();
-			buf.put(offset, (byte)(toAddr + delta));
+			System.out.println(String.format("Byte reloc at 0x%08X, delta: %d", offset, buf.get(offset)));
+			// int delta = buf.get(offset) + reloc.getAddend();
+			// buf.put(offset, (byte)(sectAddr + delta - offset));
 		} break;
 		}
 	}

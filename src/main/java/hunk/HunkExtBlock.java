@@ -3,7 +3,6 @@ package hunk;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 
 import ghidra.app.util.bin.BinaryReader;
@@ -104,7 +103,6 @@ class HunkExtBlock extends HunkBlock {
 	}
 	
 	final Integer[] readRelocs(BinaryReader reader, ExtType extType) throws IOException {
-		System.out.println(extType.name());
 		List<Integer> relocs = new ArrayList<>();
 		
 		int numRefs = reader.readNextInt();

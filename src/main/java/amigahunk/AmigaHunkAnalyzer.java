@@ -53,6 +53,8 @@ import ghidra.util.task.TaskMonitor;
 
 public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 	
+	private static final int imageBaseOffset = 0x10000;
+	
 	private final List<String> filter = new ArrayList<String>();
 	private FdFunctionsInLibs funcsList;
 	
@@ -125,7 +127,7 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 			
 			int i = 1;
 			for (String lib : libs) {
-				createFunctionsSegment(fpa, lib, i * 0x1000, funcsList.getFunctionTableByLib(lib), log);
+				createFunctionsSegment(fpa, lib, AmigaHunkLoader.getImageBase(imageBaseOffset) + i * 0x1000, funcsList.getFunctionTableByLib(lib), log);
 				i++;
 			}
 		} catch (InvalidInputException | DuplicateNameException | CodeUnitInsertionException e) {
