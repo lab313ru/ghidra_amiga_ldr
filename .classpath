@@ -4,7 +4,7 @@
 	<classpathentry kind="src" path="src/main/help"/>
 	<classpathentry kind="src" path="src/main/resources"/>
 	<classpathentry kind="src" path="ghidra_scripts"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/jdk-11.0.4"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/jdk-11.0.6"/>
 	<classpathentry kind="lib" path="D:/ghidra_9.1.2_PUBLIC/Ghidra/Processors/68000/lib/68000.jar" sourcepath="D:/ghidra_9.1.2_PUBLIC/Ghidra/Processors/68000/lib/68000-src.zip">
 		<attributes>
 			<attribute name="javadoc_location" value="jar:file:/D:\ghidra_9.1.2_PUBLIC\docs\GhidraAPI_javadoc.zip!/api/"/>
