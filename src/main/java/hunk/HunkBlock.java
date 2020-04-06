@@ -14,7 +14,7 @@ public abstract class HunkBlock {
 	HunkBlock(HunkType blkId, BinaryReader reader) {
 		this.blkId = blkId;
 		startPos = (int)reader.getPointerIndex();
-		hunkSize = 0;
+		hunkSize = 4;
 	}
 	
 	static String readName(BinaryReader reader) throws IOException {

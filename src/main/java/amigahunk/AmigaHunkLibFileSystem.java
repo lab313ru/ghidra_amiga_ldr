@@ -3,11 +3,11 @@ package amigahunk;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import generic.stl.Pair;
 import ghidra.app.util.bin.BinaryReader;
 import ghidra.app.util.bin.ByteProvider;
 import ghidra.app.util.bin.ByteProviderInputStream;
@@ -27,8 +27,11 @@ import ghidra.util.task.TaskMonitor;
 import hunk.HunkBlock;
 import hunk.HunkBlockFile;
 import hunk.HunkBlockType;
+import hunk.HunkLibBlock;
 import hunk.HunkNameBlock;
 import hunk.HunkParseError;
+import hunk.HunkSegment;
+import hunk.HunkSegmentBlock;
 import hunk.HunkType;
 import hunk.HunkUnitBlock;
 
@@ -69,54 +72,47 @@ public class AmigaHunkLibFileSystem implements GFileSystem {
 		try {
 			HunkBlockFile hbf = new HunkBlockFile(reader, false);
 			
-			Iterator<Map.Entry<Integer, HunkBlock>> hunkBlocks = hbf.getHunkBlocks().entrySet().iterator();
-			
-			String unitName = null, rsrvName = null;
-			int unitOffset = 0, rsrvOffset = -1;
+			String unitName = null, lastName = "";
+			int unitOffset = 0;
 			int unitSize = 0;
 			
-			while (hunkBlocks.hasNext()) {
-				Map.Entry<Integer, HunkBlock> block = hunkBlocks.next();
-				
-				HunkBlock bb = block.getValue();
+			final List<Pair<Integer, HunkBlock>> blocks = hbf.getHunkBlocks();
+			
+			for (int i = 0; i < blocks.size(); ++i) {
+				HunkBlock bb = blocks.get(i).second;
 				HunkType type = bb.getHunkType();
-				
-				System.out.println(String.format("%d - %s", fsih.getFileCount() + 1, type.name()));
 				
 				switch (type) {
 				case HUNK_UNIT: {
-					unitOffset = block.getKey();
+					unitOffset = blocks.get(i).first;
 					unitSize = bb.getSize();
 					unitName = ((HunkUnitBlock)bb).getName();
+					System.out.println(unitName);
+				} break;
+				case HUNK_LIB: {
+					// TODO: parse
+				} break;
+				case HUNK_INDEX: {
+					// TODO: parse
 				} break;
 				case HUNK_NAME: {
-					if (unitName == null) {
-						unitSize = 0;
-						unitName = ((HunkNameBlock)bb).getName();
-						unitOffset = block.getKey();
-					}
-					
+					lastName = ((HunkNameBlock)bb).getName();
 					unitSize += bb.getSize();
 				} break;
 				case HUNK_END: {
-					LibHunkItem item = new LibHunkItem();
-					
-					item.offset = (unitName != null) ? unitOffset : rsrvOffset;
-					item.name = (unitName != null) ? (!unitName.isEmpty() ? unitName : String.format("%04d", fsih.getFileCount() + 1)) : rsrvName;
-					item.size = unitSize + bb.getSize();
-					
-					fsih.storeFile(item.name, fsih.getFileCount(), false, item.size, item);
-					
-					unitSize = unitOffset = 0;
-					rsrvOffset = -1;
-					unitName = null;
+					if ((i + 1 == blocks.size()) || ((i + 1 < blocks.size()) && (blocks.get(i + 1).second.getHunkType() == HunkType.HUNK_UNIT))) { 
+						LibHunkItem item = new LibHunkItem();
+						
+						item.offset = unitOffset;
+						item.name = unitName.isEmpty() ? lastName : unitName;
+						item.size = unitSize + bb.getSize();
+						
+						fsih.storeFile(String.format("%04d_%s.o", fsih.getFileCount() + 1, item.name), fsih.getFileCount(), false, item.size, item);
+					} else {
+						unitSize += bb.getSize();
+					}
 				} break;
 				default: {
-					if (rsrvOffset == -1) {
-						rsrvOffset = block.getKey();
-						rsrvName = String.format("%04d_%s", fsih.getFileCount() + 1, type.name());
-					}
-
 					unitSize += bb.getSize();
 				} break;
 				}
@@ -221,8 +217,8 @@ public class AmigaHunkLibFileSystem implements GFileSystem {
 			HunkBlockType hbtFirst = HunkBlockFile.peekType(reader);
 			HunkBlockFile hbf = new HunkBlockFile(reader, hbtFirst == HunkBlockType.TYPE_LOADSEG);
 			
-			long unitsCount = hbf.getHunkBlocks().entrySet().stream().filter(e -> (e.getValue().getHunkType() == HunkType.HUNK_UNIT)).count();
-			return (hbtFirst == HunkBlockType.TYPE_UNIT && unitsCount > 1);
+			long unitsCount = hbf.getHunkBlocks().stream().filter(e -> (e.second.getHunkType() == HunkType.HUNK_UNIT)).count();
+			return (hbtFirst == HunkBlockType.TYPE_LIB) || (hbtFirst == HunkBlockType.TYPE_UNIT && unitsCount > 1);
 		}
 	}
 

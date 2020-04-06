@@ -1,6 +1,5 @@
 package hunk;
 
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,42 +32,36 @@ public class HunkIndexBlock extends HunkBlock {
 		try {
 			int numWords = reader.readNextInt() * 2;
 			
-			int strtabSize = reader.readNextShort();
+			int strtabSize = reader.readNextUnsignedShort();
 			strtab = reader.readNextByteArray(strtabSize);
-			// strtab = Arrays.copyOfRange(strtab, 1, strtab.length);
-			FileOutputStream fo = new FileOutputStream("d:\\AmiKitXE\\AmiKit\\Work\\sc\\lib\\memwatch.lib_strtab.bin");
-			fo.write(strtab);
-			fo.close();
 			
 			numWords = numWords - (strtabSize / 2) - 1;
 			
 			while (numWords > 1) {
-				short nameOff = reader.readNextShort();
-				short firstHunkLongOff = reader.readNextShort();
-				short numHunks = reader.readNextShort();
+				int nameOff = reader.readNextUnsignedShort();
+				int firstHunkLongOff = reader.readNextUnsignedShort();
+				int numHunks = reader.readNextUnsignedShort();
 				numWords -= 3;
 				
 				String name = getStringFromOffset(strtab, nameOff);
-				System.out.println(String.format("%s - %d", name, nameOff));
 				
 				HunkIndexUnitEntry unitEntry = new HunkIndexUnitEntry(name, firstHunkLongOff);
 				units.add(unitEntry);
 				
 				for (int i = 0; i < numHunks; ++i) {
-					nameOff = reader.readNextShort();
-					short hunkLongs = reader.readNextShort();
-					short hunkCtype = reader.readNextShort();
+					nameOff = reader.readNextUnsignedShort();
+					int hunkLongs = reader.readNextUnsignedShort();
+					int hunkCtype = reader.readNextUnsignedShort();
 					
 					name = getStringFromOffset(strtab, nameOff);
-					System.out.println(String.format("%s - %d", name, nameOff));
-					
+
 					HunkIndexHunkEntry hunkEntry = new HunkIndexHunkEntry(name, hunkLongs, hunkCtype);
 					unitEntry.addIndexHunk(hunkEntry);
 					
-					short numRefs = reader.readNextShort();
+					int numRefs = reader.readNextUnsignedShort();
 					
 					for (int j = 0; j < numRefs; ++j) {
-						nameOff = reader.readNextShort();
+						nameOff = reader.readNextUnsignedShort();
 						name = getStringFromOffset(strtab, nameOff);
 						int width = 4;
 						
@@ -78,19 +71,16 @@ public class HunkIndexBlock extends HunkBlock {
 						}
 						
 						hunkEntry.addSymRef(new HunkIndexSymbolRef(name, width));
-						
-						System.out.println(String.format("%s - %d", name, nameOff));
 					}
 					
-					short numDefs = reader.readNextShort();
+					int numDefs = reader.readNextUnsignedShort();
 					
 					for (int j = 0; j < numDefs; ++j) {
-						nameOff = reader.readNextShort();
-						short value = reader.readNextShort();
-						short stype = reader.readNextShort();
+						nameOff = reader.readNextUnsignedShort();
+						int value = reader.readNextUnsignedShort();
+						int stype = reader.readNextUnsignedShort();
 						
 						name = getStringFromOffset(strtab, nameOff);
-						System.out.println(String.format("%s - %d", name, nameOff));
 						
 						hunkEntry.addSymDef(new HunkIndexSymbolDef(name, value, stype));
 					}
@@ -100,7 +90,7 @@ public class HunkIndexBlock extends HunkBlock {
 			}
 			
 			if (numWords == 1) {
-				reader.readNextShort();
+				reader.readNextUnsignedShort();
 			}
 		} catch (IOException e) {
 			throw new HunkParseError(e);

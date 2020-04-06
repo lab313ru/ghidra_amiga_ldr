@@ -5,13 +5,13 @@ import java.util.List;
 
 public class HunkIndexHunkEntry {
 	private final String name;
-	private final short hunkLongs;
-	private final short hunkCtype;
+	private final int hunkLongs;
+	private final int hunkCtype;
 	
 	private List<HunkIndexSymbolRef> symRefs;
 	private List<HunkIndexSymbolDef> symDefs;
 	
-	public HunkIndexHunkEntry(String name, short hunkLongs, short hunkCtype) {
+	public HunkIndexHunkEntry(String name, int hunkLongs, int hunkCtype) {
 		this.name = name;
 		this.hunkLongs = hunkLongs;
 		this.hunkCtype = hunkCtype;
@@ -24,11 +24,11 @@ public class HunkIndexHunkEntry {
 		return name;
 	}
 
-	public short getHunkLongs() {
+	public int getHunkLongs() {
 		return hunkLongs;
 	}
 
-	public short getHunkCtype() {
+	public int getHunkCtype() {
 		return hunkCtype;
 	}
 

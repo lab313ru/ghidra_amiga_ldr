@@ -4,12 +4,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class HunkIndexUnitEntry {
-	private final short firstHunkLongOff;
+	private final int firstHunkLongOff;
 	private final String name;
 	
 	private List<HunkIndexHunkEntry> indexHunks;
 	
-	public HunkIndexUnitEntry(String name, short firstHunkLongOff) {
+	public HunkIndexUnitEntry(String name, int firstHunkLongOff) {
 		this.name = name;
 		this.firstHunkLongOff = firstHunkLongOff;
 		indexHunks = new ArrayList<>();
@@ -19,7 +19,7 @@ public class HunkIndexUnitEntry {
 		return name;
 	}
 
-	public short getFirstHunkLongOff() {
+	public int getFirstHunkLongOff() {
 		return firstHunkLongOff;
 	}
 	

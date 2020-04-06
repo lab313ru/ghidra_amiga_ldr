@@ -2,7 +2,8 @@ package hunk;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.SortedMap;
+
+import generic.stl.Pair;
 
 class HunkLoadSegFile {
 
@@ -22,18 +23,18 @@ class HunkLoadSegFile {
 			return;
 		}
 		
-		SortedMap<Integer, HunkBlock> blocks = bf.getHunkBlocks();
+		final List<Pair<Integer, HunkBlock>> blocks = bf.getHunkBlocks();
 		
 		if (blocks == null || blocks.isEmpty()) {
 			throw new HunkParseError("No hunk blocks found!");
 		}
 		
-		boolean isUnit = blocks.get(0).getHunkType() == HunkType.HUNK_UNIT;
+		boolean isUnit = blocks.get(0).second.getHunkType() == HunkType.HUNK_UNIT;
 		
 		HunkHeaderBlock hdr = null;
 		
 		if (!isUnit) {
-			hdr = (HunkHeaderBlock) blocks.get(0);
+			hdr = (HunkHeaderBlock) blocks.get(0).second;
 			
 			if (hdr.getHunkType() != HunkType.HUNK_HEADER) {
 				throw new HunkParseError("No HEADER block found!");
@@ -43,7 +44,9 @@ class HunkLoadSegFile {
 		List<List<HunkBlock>> first = new ArrayList<>();
 		List<HunkBlock> current = null;
 		
-		for (HunkBlock block : blocks.values()) {
+		for (Pair<Integer, HunkBlock> pair : blocks) {
+			HunkBlock block = pair.second;
+			
 			if ((block instanceof HunkHeaderBlock) || (isUnit && (block instanceof HunkUnitBlock))) {
 				continue;
 			}

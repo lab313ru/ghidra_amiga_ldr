@@ -42,6 +42,7 @@ import ghidra.framework.model.DomainObject;
 import ghidra.program.flatapi.FlatProgramAPI;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressOutOfBoundsException;
+import ghidra.program.model.data.DWordDataType;
 import ghidra.program.model.data.DataTypeConflictHandler;
 import ghidra.program.model.data.DataUtilities;
 import ghidra.program.model.data.DataUtilities.ClearDataMode;
@@ -99,8 +100,11 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 	static final byte[] RTC_MATCHWORD = new byte[] { 0x4A, (byte) 0xFC };
 	static final byte RTF_AUTOINIT = (byte) (1 << 7);
 
+	static final String defsSegmName = "DEFS";
 	static final String refsSegmName = "REFS";
+	static final int defsSegmImageBaseOffset = 0x10000;
 	static int refsLastIndex = 0;
+	static int defsLastIndex = 0;
 
 	@Override
 	public String getName() {
@@ -126,6 +130,9 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 	@Override
 	protected void load(ByteProvider provider, LoadSpec loadSpec, List<Option> options, Program program, TaskMonitor monitor, MessageLog log) throws IOException {
 
+		refsLastIndex = 0;
+		defsLastIndex = 0;
+		
 		FlatProgramAPI fpa = new FlatProgramAPI(program);
 		Memory mem = program.getMemory();
 
@@ -261,6 +268,8 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 			return;
 		}
 		
+		Memory mem = fpa.getCurrentProgram().getMemory();
+		
 		for (final XDefinition entry : seg.getSegmentInfo().getDefinitions()) {
 			Address defAddr = fpa.toAddr(entry.getOffset());
 			
@@ -268,18 +277,20 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 				defAddr = fpa.toAddr(segOffset + entry.getOffset());
 			}
 			
-			st.createLabel(defAddr, entry.getName(), SourceType.USER_DEFINED);
-			
-			if (entry.getName().equals("___startup")) {
-				setFunction(fpa, defAddr, entry.getName(), log);
+			if (mem.contains(defAddr)) {
+				st.createLabel(defAddr, entry.getName(), SourceType.USER_DEFINED);
+				
+				if (entry.getName().equals("___startup")) {
+					setFunction(fpa, defAddr, entry.getName(), log);
+				}
+			} else {
+				addDefinition(mem, fpa, st, entry.getName(), entry.getOffset());
 			}
 		}
 		
 		if (seg.getSegmentInfo().getReferences() == null) {
 			return;
 		}
-
-		Memory mem = fpa.getCurrentProgram().getMemory();
 		
 		for (final XReference entry : seg.getSegmentInfo().getReferences()) {
 			for (Integer offset : entry.getOffsets()) {
@@ -322,22 +333,69 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 	}
 
 	private static int addReference(Memory mem, FlatProgramAPI fpa, SymbolTable st, String name, int lastSectAddress) throws Throwable {
-		MemoryBlock block = mem.getBlock(refsSegmName);
-		
-		if (block == null) {
-			block = mem.createUninitializedBlock(refsSegmName, fpa.toAddr(lastSectAddress), 0x1000L, false);
-		}
-		
 		List<Symbol> syms = st.getGlobalSymbols(name);
+		
 		if (syms.size() > 0) {
 			return (int) syms.get(0).getAddress().getOffset();
 		}
 		
+		MemoryBlock block = mem.getBlock(refsSegmName);
+		
+		if (block == null) {
+			int transId = mem.getProgram().startTransaction(String.format("Create %s block", refsSegmName));
+			block = mem.createUninitializedBlock(refsSegmName, fpa.toAddr(lastSectAddress), 4, false);
+			mem.getProgram().endTransaction(transId, true);
+		}
+		
 		Address newAddress = block.getStart().add(refsLastIndex * 4);
+		expandBlockByDword(mem, block, newAddress, false);
+		
 		st.createLabel(newAddress, name, SourceType.IMPORTED);
 		refsLastIndex++;
 		
 		return (int) newAddress.getOffset();
+	}
+	
+	private static int addDefinition(Memory mem, FlatProgramAPI fpa, SymbolTable st, String name, int value) throws Throwable {
+		List<Symbol> syms = st.getGlobalSymbols(name);
+		
+		if (syms.size() > 0) {
+			return (int) syms.get(0).getAddress().getOffset();
+		}
+		
+		MemoryBlock block = mem.getBlock(defsSegmName);
+
+		if (block == null) {
+			int transId = mem.getProgram().startTransaction(String.format("Create %s block", defsSegmName));
+			block = mem.createInitializedBlock(defsSegmName, fpa.toAddr(getImageBase(defsSegmImageBaseOffset)), 4, (byte) 0x00, TaskMonitor.DUMMY, false);
+			mem.getProgram().endTransaction(transId, true);
+		}
+		
+		Address newAddress = block.getStart().add(defsLastIndex * 4);
+		expandBlockByDword(mem, block, newAddress, true);
+		
+		st.createLabel(newAddress, name, SourceType.USER_DEFINED);
+		mem.setInt(newAddress, value);
+		DataUtilities.createData(mem.getProgram(), newAddress, DWordDataType.dataType, -1, true, ClearDataMode.CLEAR_ALL_UNDEFINED_CONFLICT_DATA);
+		defsLastIndex++;
+		
+		return (int) newAddress.getOffset();
+	}
+	
+	private static void expandBlockByDword(Memory mem, MemoryBlock block, Address appendAddress, boolean initialized) throws Throwable {
+		if (block.getStart().equals(appendAddress)) {
+			return;
+		}
+		
+		int transId = mem.getProgram().startTransaction(String.format("Expand %s block", block.getName()));
+		MemoryBlock tmp = mem.createUninitializedBlock(block.getName() + ".exp", appendAddress, 4, false);
+		mem.getProgram().endTransaction(transId, true);
+		
+		if (initialized) {
+			tmp = mem.convertToInitialized(tmp, (byte)0x00);
+		}
+		
+		MemoryBlock check = mem.join(block, tmp);
 	}
 
 	private static byte[] intToBytes(int x) {
@@ -542,10 +600,10 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 
 	private static void createBaseSegment(FlatProgramAPI fpa, MessageLog log) {
 		MemoryBlock exec = createSegment(null, fpa, "EXEC", 0x4, 4, false, false, log);
+		
+		Program program = fpa.getCurrentProgram();
 
 		try {
-			Program program = fpa.getCurrentProgram();
-
 			DataUtilities.createData(program, exec.getStart(), new PointerDataType((new ExecLibrary()).toDataType()), -1, false,
 					ClearDataMode.CLEAR_ALL_UNDEFINED_CONFLICT_DATA);
 
@@ -569,7 +627,12 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 			long size, boolean write, boolean execute, MessageLog log) {
 		MemoryBlock block;
 		try {
+			Program program = fpa.getCurrentProgram();
+			
+			int transId = program.startTransaction(String.format("Create %s block", name));
 			block = fpa.createMemoryBlock(name, fpa.toAddr(address), stream, size, false);
+			program.endTransaction(transId, true);
+			
 			block.setRead(true);
 			block.setWrite(write);
 			block.setExecute(execute);

@@ -2,10 +2,10 @@ package hunk;
 
 public class HunkIndexSymbolDef {
 	private final String name;
-	private final short value;
-	private final short symCtype;
+	private final int value;
+	private final int symCtype;
 	
-	public HunkIndexSymbolDef(String name, short value, short symCtype) {
+	public HunkIndexSymbolDef(String name, int value, int symCtype) {
 		this.name = name;
 		this.value = value;
 		this.symCtype = symCtype;
@@ -15,11 +15,11 @@ public class HunkIndexSymbolDef {
 		return name;
 	}
 
-	public short getValue() {
+	public int getValue() {
 		return value;
 	}
 
-	public short getSymCtype() {
+	public int getSymCtype() {
 		return symCtype;
 	}
 }

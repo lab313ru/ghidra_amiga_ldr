@@ -1,14 +1,15 @@
 package hunk;
 
 import java.io.IOException;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.util.ArrayList;
+import java.util.List;
 
+import generic.stl.Pair;
 import ghidra.app.util.bin.BinaryReader;
 
 public class HunkLibBlock extends HunkBlock {
 	
-	private SortedMap<Long, HunkBlock> blocks;
+	private List<Pair<Long, HunkBlock>> blocks;
 
 	public HunkLibBlock(BinaryReader reader, boolean isExecutable) throws HunkParseError {
 		super(HunkType.HUNK_LIB, reader);
@@ -19,7 +20,7 @@ public class HunkLibBlock extends HunkBlock {
 
 	@Override
 	void parse(BinaryReader reader, boolean isExecutable) throws HunkParseError {
-		blocks = new TreeMap<>();
+		blocks = new ArrayList<>();
 		
 		try {
 			int numLongs = reader.readNextInt();
@@ -35,7 +36,7 @@ public class HunkLibBlock extends HunkBlock {
 					throw new HunkParseError(String.format("Unsupported hunk type: %04d", tag & HunkType.HUNK_TYPE_MASK));
 				}
 				
-				blocks.put(pos, block);
+				blocks.add(new Pair<>(pos, block));
 				
 				pos = reader.getPointerIndex();
 			}
@@ -44,7 +45,7 @@ public class HunkLibBlock extends HunkBlock {
 		}
 	}
 
-	public SortedMap<Long, HunkBlock> getHunkBlocks() {
+	public final List<Pair<Long, HunkBlock>> getHunkBlocks() {
 		return blocks;
 	}
 }
