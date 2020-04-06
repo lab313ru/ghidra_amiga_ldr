@@ -9,7 +9,7 @@ import ghidra.app.util.bin.BinaryReader;
 
 public class HunkLibBlock extends HunkBlock {
 	
-	private List<Pair<Long, HunkBlock>> blocks;
+	private List<Pair<Integer, HunkBlock>> blocks;
 
 	public HunkLibBlock(BinaryReader reader, boolean isExecutable) throws HunkParseError {
 		super(HunkType.HUNK_LIB, reader);
@@ -36,7 +36,7 @@ public class HunkLibBlock extends HunkBlock {
 					throw new HunkParseError(String.format("Unsupported hunk type: %04d", tag & HunkType.HUNK_TYPE_MASK));
 				}
 				
-				blocks.add(new Pair<>(pos, block));
+				blocks.add(new Pair<>((int)pos, block));
 				
 				pos = reader.getPointerIndex();
 			}
@@ -45,7 +45,7 @@ public class HunkLibBlock extends HunkBlock {
 		}
 	}
 
-	public final List<Pair<Long, HunkBlock>> getHunkBlocks() {
+	public final List<Pair<Integer, HunkBlock>> getHunkBlocks() {
 		return blocks;
 	}
 }

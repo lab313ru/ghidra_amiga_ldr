@@ -35,7 +35,7 @@ public enum HunkType {
 	
 	public static final int HUNK_TYPE_MASK = 0xFFFF;
 	
-	static HunkType fromInteger(int value) {
+	public static HunkType fromInteger(int value) {
 		HunkType[] arr = values();
 		
 		for (HunkType t : arr) {
