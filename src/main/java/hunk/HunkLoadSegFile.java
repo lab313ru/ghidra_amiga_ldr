@@ -29,7 +29,7 @@ class HunkLoadSegFile {
 			throw new HunkParseError("No hunk blocks found!");
 		}
 		
-		boolean isUnit = blocks.get(0).second.getHunkType() == HunkType.HUNK_UNIT;
+		boolean isUnit = (blocks.get(0).second.getHunkType() == HunkType.HUNK_UNIT) || (blocks.get(0).second.getHunkType() == HunkType.HUNK_CODE);
 		
 		HunkHeaderBlock hdr = null;
 		

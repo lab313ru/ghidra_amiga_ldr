@@ -69,7 +69,7 @@ public class HunkBlockFile {
 	private static HunkBlockType mapHunkTypeToHunkBlockType(HunkType blkId) {
 		if (blkId == HunkType.HUNK_HEADER) {
 			return HunkBlockType.TYPE_LOADSEG;
-		} else if (blkId == HunkType.HUNK_UNIT) {
+		} else if (blkId == HunkType.HUNK_UNIT || blkId == HunkType.HUNK_CODE) {
 			return HunkBlockType.TYPE_UNIT;
 		} else if (blkId == HunkType.HUNK_LIB) {
 			return HunkBlockType.TYPE_LIB;

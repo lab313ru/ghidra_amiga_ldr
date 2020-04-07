@@ -3,6 +3,8 @@ package amigahunk;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -81,6 +83,7 @@ public class AmigaHunkLibFileSystem implements GFileSystem {
 			int unitSize = 0;
 			int[] firstLibUnitOffset = {-1};
 			HunkLibBlock libBlock = null;
+			int libBlockIndex = 0;
 			
 			final List<Pair<Integer, HunkBlock>> blocks = hbf.getHunkBlocks();
 			
@@ -94,7 +97,6 @@ public class AmigaHunkLibFileSystem implements GFileSystem {
 					unitOffset = hunkOffset;
 					unitSize = bb.getSize();
 					unitName = ((HunkUnitBlock)bb).getName();
-					System.out.println(unitName);
 				} break;
 				case HUNK_LIB: {
 					for (Pair<Integer, HunkBlock> block : ((HunkLibBlock)bb).getHunkBlocks()) {
@@ -106,40 +108,68 @@ public class AmigaHunkLibFileSystem implements GFileSystem {
 					}
 					
 					libBlock = (HunkLibBlock)bb;
+					libBlockIndex++;
 				} break;
 				case HUNK_INDEX: {
 					if (libBlock == null) {
 						throw new HunkParseError("HUNK_INDEX doesn't contain corresponding HUNK_LIB block");
 					}
 					
+					List<Pair<Integer, String>> offsetAndName = new ArrayList<>();
+					
 					for (HunkIndexUnitEntry unitEntry : ((HunkIndexBlock)bb).getHunkIndexUnitEntries()) {
 						int offset = unitEntry.getFirstHunkLongOff() * 4;
-						System.out.println(String.format("HunkOffset: 0x%08X, Name: %s", offset, unitEntry.getName()));
 						
-						HunkBlock block = null;
+//						final List<Pair<Integer, HunkBlock>> libHunkBlocks = libBlock.getHunkBlocks();
+//						
+//						Pair<Integer, HunkBlock> block = libHunkBlocks.stream().filter(e -> e.first == (firstLibUnitOffset[0] + offset)).findFirst().get();
+//						
+//						if (block == null) {
+//							throw new HunkParseError("Cannot find corresponding index block");
+//						}
 						
-						for (Pair<Integer, HunkBlock> block_ : libBlock.getHunkBlocks()) {
-							if (block_.first == firstLibUnitOffset[0] + offset) {
-								block = block_.second;
-								break;
-							}
-						}
+						offsetAndName.add(new Pair<Integer, String>(firstLibUnitOffset[0] + offset, unitEntry.getName()));
 						
-						if (block == null) {
-							throw new HunkParseError("Cannot find corresponding index block");
-						}
+						System.out.println(String.format("HunkOffset: 0x%08X, Name: %s", firstLibUnitOffset[0] + offset, unitEntry.getName()));
 						
-						for (HunkIndexHunkEntry hunkEntry : unitEntry.getHunkIndexHunkEntries()) {
-							System.out.println(String.format("Entry name: %s, Type: %s, Size: %d", hunkEntry.getName(), HunkType.fromInteger(hunkEntry.getHunkCtype()).name(), hunkEntry.getHunkLongs() * 4));
-							
-							for (HunkIndexSymbolDef symDef : hunkEntry.getSymDefs()) {
-								System.out.println(String.format("Def name: %s, Value: %d, Type: %d", symDef.getName(), symDef.getValue(), symDef.getSymCtype()));
-							}
-							
-							for (HunkIndexSymbolRef symRef : hunkEntry.getSymRefs()) {
-								System.out.println(String.format("Ref name: %s, Width: %d", symRef.getName(), symRef.getWidth()));
-							}
-						}
+						// int subItemSiz = ((i + 1 == blocks.size()) || ((i + 1 < blocks.size()) && (blocks.get(i + 1).second.getHunkType() == HunkType.HUNK_UNIT)));
+						
+//						for (HunkIndexHunkEntry hunkEntry : unitEntry.getHunkIndexHunkEntries()) {
+//							System.out.println(String.format("Entry name: %s, Type: %s, Size: %d", hunkEntry.getName(), HunkType.fromInteger(hunkEntry.getHunkCtype()).name(), hunkEntry.getHunkLongs() * 4));
+//							
+//							for (HunkIndexSymbolDef symDef : hunkEntry.getSymDefs()) {
+//								System.out.println(String.format("Def name: %s, Value: %d, Type: %d", symDef.getName(), symDef.getValue(), symDef.getSymCtype()));
+//							}
+//							
+//							for (HunkIndexSymbolRef symRef : hunkEntry.getSymRefs()) {
+//								System.out.println(String.format("Ref name: %s, Width: %d", symRef.getName(), symRef.getWidth()));
+//							}
+//						}
+					}
+					
+					List<Pair<String, Pair<Integer, Integer>>> nameAndSizeOffset = new ArrayList<>();
+					
+					for (int j = 0; j < offsetAndName.size(); ++j) {
+						int offset1 = offsetAndName.get(j).first;
+						int offset2 = (j + 1 < offsetAndName.size()) ? offsetAndName.get(j + 1).first : (firstLibUnitOffset[0] + libBlock.getSize());
+						nameAndSizeOffset.add(new Pair<String, Pair<Integer, Integer>>(offsetAndName.get(j).second, new Pair<>(offset2 - offset1, offset1)));
+					}
+					
+					LibHunkItem item = new LibHunkItem();
+					item.name = String.format("LIB_%02d", libBlockIndex);
+					item.offset = firstLibUnitOffset[0];
+					item.size = libBlock.getSize() + bb.getSize();
+					
+					fsih.storeFile(item.name, -1, true, -1, item);
+					
+					for (Pair<String, Pair<Integer, Integer>> nameSizeOffset : nameAndSizeOffset) {
+						LibHunkItem subItem = new LibHunkItem();
+						
+						subItem.offset = nameSizeOffset.second.second;
+						subItem.name = nameSizeOffset.first;
+						subItem.size = nameSizeOffset.second.first;
+						
+						fsih.storeFile(String.format("%s/%s", item.name, subItem.name), fsih.getFileCount(), false, subItem.size, subItem);
 					}
 					
 					libBlock = null;
@@ -267,8 +297,8 @@ public class AmigaHunkLibFileSystem implements GFileSystem {
 			HunkBlockType hbtFirst = HunkBlockFile.peekType(reader);
 			HunkBlockFile hbf = new HunkBlockFile(reader, hbtFirst == HunkBlockType.TYPE_LOADSEG);
 			
-			long unitsCount = hbf.getHunkBlocks().stream().filter(e -> (e.second.getHunkType() == HunkType.HUNK_UNIT)).count();
-			return (hbtFirst == HunkBlockType.TYPE_LIB) || (hbtFirst == HunkBlockType.TYPE_UNIT && unitsCount > 1);
+			long unitsCount = hbf.getHunkBlocks().stream().filter(e -> ((e.second.getHunkType() == HunkType.HUNK_UNIT) || (e.second.getHunkType() == HunkType.HUNK_LIB))).count();
+			return ((hbtFirst == HunkBlockType.TYPE_LIB || hbtFirst == HunkBlockType.TYPE_UNIT) && unitsCount > 1);
 		}
 	}
 
