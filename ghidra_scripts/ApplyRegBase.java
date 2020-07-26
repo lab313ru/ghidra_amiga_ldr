@@ -32,6 +32,8 @@ public class ApplyRegBase extends GhidraScript {
         {
             doAnalysis(fi.next(), reg, addr);
         }
+        
+        analyzeAll(currentProgram);
 	}
 	
 	private void doAnalysis(Function func, Register reg, Address addr) {

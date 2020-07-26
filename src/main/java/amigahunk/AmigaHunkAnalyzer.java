@@ -206,11 +206,16 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 				public boolean evaluateContext(VarnodeContext context, Instruction instr) {
 					String mnemonic = instr.getMnemonicString();
 
-					if (mnemonic.equals("jsr")) {
+					if (mnemonic.equals("jsr") || mnemonic.equals("jmp")) {
 						Object[] objs = instr.getOpObjects(0);
 						Register reg = instr.getRegister(1);
 						if (reg != null && reg.getName().equals("A6") && objs.length != 0 && (objs[0] instanceof Scalar)) {
-							FdFunction[] funcs = funcsList.getLibsFunctionsByBias(filter, (int)((Scalar)objs[0]).getSignedValue());
+							int val = (int)((Scalar)objs[0]).getSignedValue();
+							
+							if (val >= 0) {
+								return false;
+							}
+							FdFunction[] funcs = funcsList.getLibsFunctionsByBias(filter, val);
 							
 							for (FdFunction func : funcs) {
 								Address funcStart = program.getMemory().getBlock(func.getLib()).getStart().add(Math.abs(func.getBias()));
