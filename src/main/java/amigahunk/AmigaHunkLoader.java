@@ -395,7 +395,7 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 			tmp = mem.convertToInitialized(tmp, (byte)0x00);
 		}
 		
-		MemoryBlock check = mem.join(block, tmp);
+		mem.join(block, tmp);
 	}
 
 	private static byte[] intToBytes(int x) {
