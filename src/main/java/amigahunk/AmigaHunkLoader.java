@@ -565,8 +565,8 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 						params.add(new ParameterImpl("base", new PointerDataType(baseStruct), program.getRegister("A6"), program));
 
 						if (funcDef != null) {
-							List<Map.Entry<String, String>> args = funcDef.getArgs();
-							for (Entry<String, String> arg : args) {
+							Map<String, String> args = funcDef.getArgs();
+							for (Entry<String, String> arg : args.entrySet()) {
 								params.add(new ParameterImpl(arg.getKey(), PointerDataType.dataType,
 										program.getRegister(arg.getValue()), program));
 							}

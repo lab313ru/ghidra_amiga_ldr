@@ -52,7 +52,7 @@ import ghidra.util.exception.InvalidInputException;
 import ghidra.util.task.TaskMonitor;
 
 public class AmigaHunkAnalyzer extends AbstractAnalyzer {
-	
+
 	private static final int imageBaseOffset = 0x10000;
 	
 	private final List<String> filter = new ArrayList<String>();
@@ -91,7 +91,7 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 		if (funcsList == null) {
 			return;
 		}
-		
+
 		String[] libsList = funcsList.getLibsList(filter);
 		for (String lib : libsList) {
 			options.registerOption(lib.replace(FdParser.LIB_FD_EXT, "").toUpperCase(), true, null, String.format("Analyze calls from %s", lib));
@@ -101,7 +101,7 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 	@Override
 	public void optionsChanged(Options options, Program program) {
 		super.optionsChanged(options, program);
-		
+
 		if (funcsList == null) {
 			return;
 		}
@@ -140,7 +140,7 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 		}
 		
 		monitor.setMessage("Analysing library calls...");
-		
+
 		FunctionIterator fiter = program.getFunctionManager().getFunctions(set, true);
 		while (fiter.hasNext()) {
 			if (monitor.isCancelled()) {
@@ -183,10 +183,9 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 
 			Program program = fpa.getCurrentProgram();
 
-			List<Map.Entry<String, String>> args = func.getArgs();
-			for (Entry<String, String> arg : args) {
-				params.add(new ParameterImpl(arg.getKey(), PointerDataType.dataType,
-						program.getRegister(arg.getValue()), program));
+			Map<String, String> args = func.getArgs();
+			for (Entry<String, String> arg : args.entrySet()) {
+				params.add(new ParameterImpl(arg.getKey(), PointerDataType.dataType, program.getRegister(arg.getValue()), program));
 			}
 
 			function.updateFunction(null, null, FunctionUpdateType.CUSTOM_STORAGE, true,

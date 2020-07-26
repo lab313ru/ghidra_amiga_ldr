@@ -1,0 +1,151 @@
+* arp_lib.fd, Created 10-Jan-88 by SDB,
+* for all you lettuce heads out there.
+* Use at your own risk, etc.,etc.,etc.
+* New functions added 24-Jan-88, SDB
+* Final additions for V33.4, 14-Feb-88, SDB
+* Final Final addition: 16-Feb-88, add register optimizations for Peabody.
+* tweeked for v37
+##base _ArpBase
+##bias 30
+##private
+* --- DOS Identical functions
+Open(name,accessMode)(D1/D2)
+Close(file)(D1)
+Read(file,buffer,length)(D1/D2/D3)
+Write(file,buffer,length)(D1/D2/D3)
+Input()
+Output()
+Seek(file,position,offset)(D1/D2/D3)
+DeleteFile(name)(D1)
+Rename(oldName,newName)(D1/D2)
+Lock(name,type)(D1/D2)
+UnLock(lock)(D1)
+DupLock(lock)(D1)
+Examine(lock,fileInfoBlock)(D1/D2)
+ExNext(lock,fileInfoBlock)(D1/D2)
+Info(lock,parameterBlock)(D1/D2)
+CreateDir(name)(D1)
+CurrentDir(lock)(D1)
+IoErr()
+CreateProc(name,pri,segList,stackSize)(D1/D2/D3/D4)
+Exit(returnCode)(D1)
+LoadSeg(fileName)(D1)
+UnLoadSeg(segment)(D1)
+##private
+GetPacket(wait)(D1)
+QueuePacket(packet)(D1)
+##private
+DeviceProc(name)(D1)
+SetComment(name,comment)(D1/D2)
+SetProtection(name,mask)(D1/D2)
+DateStamp(date)(D1)
+Delay(timeout)(D1)
+WaitForChar(file,timeout)(D1/D2)
+ParentDir(lock)(D1)
+IsInteractive(file)(D1)
+* Introducing a Major Contributor to ARP, the Execute() function call...
+Execute(string,file,file)(D1/D2/D3)
+*--- ARP Functions
+*--- Functions marked private are only because we don't want lattice
+*--- to generate code, but rather use the stub routines in LatticeGlue.s
+*---
+##private
+Printf(string, stream)(a0/a1)
+FPrintf(file,string,stream)(d0,a0/a1)
+##public
+Puts(string)(a1)
+ReadLine(buffer)(a0)
+GADS(line,len,help,args,tplate)(a0,d0/a1/a2/a3)
+Atol(string)(a0)
+EscapeString(string)(a0)
+CheckAbort(func)(a1)
+CheckBreak(masks,func)(d1/a1)
+Getenv(string,buffer,size)(a0/a1,d0)
+Setenv(varname,value)(a0/a1)
+FileRequest(FileRequester)(a0)
+CloseWindowSafely(Window1,Window2)(a0/a1)
+CreatePort(name,pri)(a0,d0)
+DeletePort(port)(a1)
+SendPacket(action,args,handler)(d0/a0/a1)
+InitStdPacket(action,args,packet,replyport)(d0/a0/a1/a2)
+PathName(lock,buffer,componentcount)(d0/a0,d1)
+Assign(logical,physical)(a0/a1)
+DosAllocMem(size)(d0)
+DosFreeMem(dosblock)(a1)
+BtoCStr(cstr,bstr,maxlength)(a0,d0/d1)
+CtoBStr(cstr,bstr,maxlength)(a0,d0/d1)
+GetDevInfo(devnode)(a2)
+FreeTaskResList()
+ArpExit(rc,result2)(d0/d2)
+
+##private
+ArpAlloc(size)(d0)
+ArpAllocMem(size,requirements)(d0/d1)
+ArpOpen(name,mode)(d1/d2)
+ArpDupLock(lock)(d1)
+ArpLock(name,mode)(d1/d2)
+RListAlloc(reslist,size)(a0,d0)
+##public
+
+FindCLI(clinum)(d0)
+QSort(base,rsize,bsize,comp)(a0,d0/d1/a1)
+PatternMatch(pattern,string)(a0/a1)
+FindFirst(pattern,AnchorPath)(d0/a0)
+FindNext(AnchorPath)(a0)
+FreeAnchorChain(AnchorPath)(a0)
+CompareLock(lock1,lock2)(d0/d1)
+FindTaskResList()
+CreateTaskResList()
+FreeResList(freelist)(a1)
+FreeTrackedItem(item)(a1)
+
+##private
+GetTracker()
+##public
+
+GetAccess(tracker)(a1)
+FreeAccess(tracker)(a1)
+FreeDAList(node)(a1)
+AddDANode(data,dalist,length,id)(a0/a1,d0/d1)
+AddDADevs(dalist,select)(a0,d0)
+Strcmp(s1,s2)(a0/a1)
+Strncmp(s1,s2,count)(a0/a1,d0)
+
+##private
+* -- uses 16 bit arg
+Toupper(character)(d0)
+##public
+
+SyncRun(name,command,input,output)(a0/a1,d0/d1)
+
+* -- The Next generation, the adventure continues!
+
+ASyncRun(name,command,pcb)(a0/a1/a2)
+LoadPrg(name)(d1)
+PreParse(source,dest)(a0/a1)
+StamptoStr(datetime)(a0)
+StrtoStamp(datetime)(a0)
+ObtainResidentPrg(name)(a0)
+AddResidentPrg(Segment,name)(d1/a0)
+RemResidentPrg(name)(a0)
+UnLoadPrg(segment)(d1)
+LMult(a,b)(d0/d1)
+LDiv(a,b)(d0/d1)
+LMod(a,b)(d0/d1)
+CheckSumPrg(ResidentNode)(d0)
+TackOn(pathname,filename)(a0/a1)
+BaseName(name)(a0)
+ReleaseResidentPrg(segment)(d1)
+
+* --- v37 stuff
+
+##private
+SPrintf(file,string,stream)(d0,a0/a1)
+* --- don't know register usage of this
+GetKeywordIndex(char *,char *)(A0/A1)
+* next 2 are tracked
+ArpOpenLibrary(name,vers)(a1,d0)
+ArpAllocFreq()()
+##public
+
+##end

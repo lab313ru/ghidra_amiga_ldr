@@ -16,6 +16,7 @@ public class FdParser {
 	public static final String LIB_FD_EXT = "_lib.fd";
 	public static final String EXEC_LIB = "exec" + LIB_FD_EXT;
 	public static final String DOS_LIB = "dos" + LIB_FD_EXT;
+	private static final Pattern FUNC_PAT = Pattern.compile("([A-Za-z][_A-Za-z00-9]+)\\((.*?)\\)(?:\\((.*?)\\))?");
 
 	public static FdLibFunctions readFdFile(String libName) {
 		try {
@@ -37,8 +38,6 @@ public class FdParser {
 	}
 	
 	private static FdLibFunctions readFd(File f) throws Exception {
-		final Pattern funcPat = Pattern.compile("([A-Za-z][_A-Za-z00-9]+)\\((.*)\\)\\((.*)\\)");
-		
 		FdLibFunctions funcTable = null;
 		
 		int bias = 0;
@@ -57,7 +56,7 @@ public class FdParser {
 		
 		for (String line : lines) {
 			line = line.strip();
-			
+
 			if (line.length() > 1 && line.charAt(0) != '*') {
 				// command
 				if (line.charAt(0) == '#' && line.charAt(1) == '#') {
@@ -79,7 +78,7 @@ public class FdParser {
 						return null;
 					}
 				} else {
-					Matcher m = funcPat.matcher(line);
+					Matcher m = FUNC_PAT.matcher(line);
 					
 					if (!m.matches()) {
 						throw new Exception("Invalid FD format!");
@@ -94,7 +93,7 @@ public class FdParser {
 					}
 					
 					String args = m.group(2);
-					String regs = m.group(3);
+					String regs = m.group(3) != null ? m.group(3) : "";
 					
 					String[] arg = args.replaceAll(",", "/").split("/");
 					String[] reg = regs.replaceAll(",", "/").split("/");
@@ -118,7 +117,7 @@ public class FdParser {
 						}
 					}
 					
-					if (!arg[0].equals("")) {
+					if (!arg[0].isEmpty()) {
 						for (int i = 0; i < arg.length; ++i) {
 							func.addArg(arg[i], reg[i].toUpperCase());
 						}

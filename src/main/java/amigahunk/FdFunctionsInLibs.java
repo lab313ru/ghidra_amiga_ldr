@@ -38,7 +38,7 @@ public class FdFunctionsInLibs {
 				funcsList.addAll(Arrays.asList(fd.getFunctions()));
 		    }
 		} catch (IOException e) {
-			
+			e.printStackTrace();
 		}
 	}
 	

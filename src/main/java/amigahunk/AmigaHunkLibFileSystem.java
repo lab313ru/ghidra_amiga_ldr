@@ -4,11 +4,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import generic.stl.Pair;
 import ghidra.app.util.bin.BinaryReader;
@@ -37,9 +35,6 @@ import hunk.HunkUnitBlock;
 import hunk.HunkLibBlock;
 import hunk.HunkIndexUnitEntry;
 import hunk.HunkIndexBlock;
-import hunk.HunkIndexHunkEntry;
-import hunk.HunkIndexSymbolDef;
-import hunk.HunkIndexSymbolRef;
 
 @FileSystemInfo(
 		type = "amigahunklibfile",
