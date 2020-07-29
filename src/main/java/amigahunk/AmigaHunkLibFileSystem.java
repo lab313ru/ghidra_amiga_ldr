@@ -287,6 +287,10 @@ public class AmigaHunkLibFileSystem implements GFileSystem {
 		public boolean probe(FSRL containerFSRL, ByteProvider byteProvider, File containerFile,
 				FileSystemService fsService, TaskMonitor monitor)
 				throws IOException, CancelledException {
+			
+			if (!HunkBlockFile.isHunkBlockFile(new BinaryReader(byteProvider, false))) {
+				return false;
+			}
 
 			BinaryReader reader = new BinaryReader(byteProvider, false);
 			HunkBlockType hbtFirst = HunkBlockFile.peekType(reader);
