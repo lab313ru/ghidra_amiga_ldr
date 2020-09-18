@@ -132,7 +132,7 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 					continue;
 				}
 				
-				createFunctionsSegment(fpa, lib, AmigaHunkLoader.getImageBase(imageBaseOffset) + i * 0x1000, funcsList.getFunctionTableByLib(lib), log);
+				createFunctionsSegment(fpa, lib, AmigaHunkLoader.getImageBase(imageBaseOffset) + i * 0x10000, funcsList.getFunctionTableByLib(lib), log);
 			}
 		} catch (InvalidInputException | DuplicateNameException | CodeUnitInsertionException e) {
 			log.appendException(e);
