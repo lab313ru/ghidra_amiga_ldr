@@ -40,7 +40,9 @@ import ghidra.program.model.listing.Instruction;
 import ghidra.program.model.listing.ParameterImpl;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.listing.Function.FunctionUpdateType;
+import ghidra.program.model.mem.MemoryBlock;
 import ghidra.program.model.scalar.Scalar;
+import ghidra.program.model.symbol.Reference;
 import ghidra.program.model.symbol.RefType;
 import ghidra.program.model.symbol.SourceType;
 import ghidra.program.model.util.CodeUnitInsertionException;
@@ -218,16 +220,24 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 							FdFunction[] funcs = funcsList.getLibsFunctionsByBias(filter, val);
 							
 							for (FdFunction func : funcs) {
-								Address funcStart = program.getMemory().getBlock(func.getLib()).getStart().add(Math.abs(func.getBias()));
-								instr.addOperandReference(1, funcStart, RefType.CALL_OVERRIDE_UNCONDITIONAL, SourceType.ANALYSIS);
-							}
-							
-							for (int i = 0; i < funcs.length; ++i) {
-								FdFunction func = funcs[i];
-								
-								if (!func.isPrivate() && func.getLib().equals(FdParser.EXEC_LIB)) {
-									instr.setPrimaryMemoryReference(instr.getOperandReferences(1)[i]);
-									break;
+								MemoryBlock libMemory = program.getMemory().getBlock(func.getLib());
+								if (libMemory != null) {
+									Address funcStart = libMemory.getStart().add(Math.abs(func.getBias()));
+									if (libMemory.contains(funcStart)) {
+										Reference primaryRef = instr.getPrimaryReference(1);
+
+										instr.addOperandReference(1, funcStart, RefType.CALL_OVERRIDE_UNCONDITIONAL, SourceType.ANALYSIS);
+
+										if (((null == primaryRef) || (SourceType.ANALYSIS == primaryRef.getSource())) &&
+												!func.isPrivate() && func.getLib().equals(FdParser.EXEC_LIB)) {
+											for (Reference ref : instr.getOperandReferences(1)) {
+												if (funcStart.equals(ref.getToAddress())) {
+													instr.setPrimaryMemoryReference(ref);
+													break;
+												}
+											}
+										}
+									}
 								}
 							}
 						}
