@@ -125,16 +125,8 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 		FlatProgramAPI fpa = new FlatProgramAPI(program);
 		
 		try {
-			String[] libs = funcsList.getLibsList(filter);
-			
-			for (String lib : libs) {
-				int i = funcsList.findLibIndex(lib) + 1;
-				
-				if (i == 0) {
-					continue;
-				}
-				
-				createFunctionsSegment(fpa, lib, AmigaHunkLoader.getImageBase(imageBaseOffset) + i * 0x10000, funcsList.getFunctionTableByLib(lib), log);
+			for (String lib : funcsList.getLibsList(filter)) {
+				createFunctionsSegment(fpa, lib, funcsList.getFunctionTableByLib(lib), log);
 			}
 		} catch (InvalidInputException | DuplicateNameException | CodeUnitInsertionException e) {
 			log.appendException(e);
@@ -168,15 +160,34 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 		return true;
 	}
 	
-	private static void createFunctionsSegment(FlatProgramAPI fpa, String lib, long segAddr, FdLibFunctions funcs, MessageLog log) throws InvalidInputException, DuplicateNameException, CodeUnitInsertionException {
-		if (fpa.getMemoryBlock(fpa.toAddr(segAddr)) != null) {
+	private static void createFunctionsSegment(FlatProgramAPI fpa, String lib, FdLibFunctions funcs, MessageLog log) throws InvalidInputException, DuplicateNameException, CodeUnitInsertionException {
+		if ((null == funcs) || (fpa.getMemoryBlock(lib) != null)) {
 			return;
 		}
+		FdFunction[] funcArr = funcs.getFunctions();
+		long segAlign = Math.max(2, 0x1000);
+		long segSize = 6 * Math.max(5, 7);  // Library 5+, Device 7+
+		for (FdFunction func : funcArr) {
+			segSize = Math.max(segSize, Math.abs(func.getBias()) + 6);
+		}
+		segSize = ((segSize + (segAlign - 1)) / segAlign) * segAlign;
+		Address segAddr = fpa.toAddr(AmigaHunkLoader.getImageBase(0));
+		for (MemoryBlock memBlock : fpa.getMemoryBlocks()) {
+			if (memBlock.contains(segAddr) || memBlock.contains(segAddr.add(segSize - 1)) || (
+				(segAddr.getOffset() <= memBlock.getStart().getOffset()) &&
+				(memBlock.getEnd().getOffset() <= segAddr.add(segSize - 1).getOffset()))) {
+				segAddr = memBlock.getEnd().add(1);
+				long segRem = segAddr.getOffset() % segAlign;
+				if (segRem > 0) {
+					segAddr = segAddr.add(segAlign - segRem);
+				}
+			}
+		}
 		
-		AmigaHunkLoader.createSegment(null, fpa, lib, segAddr, 0x1000, true, true, log);
+		AmigaHunkLoader.createSegment(null, fpa, lib, segAddr.getOffset(), segSize, true, true, log);
 		
-		for (FdFunction func : funcs.getFunctions()) {
-			Address funcAddress = fpa.toAddr(segAddr + Math.abs(func.getBias()));
+		for (FdFunction func : funcArr) {
+			Address funcAddress = segAddr.add(Math.abs(func.getBias()));
 			AmigaHunkLoader.setFunction(fpa, funcAddress, func.getName(true).replace(FdFunction.LIB_SPLITTER, "_"), log);
 			Function function = fpa.getFunctionAt(funcAddress);
 			function.setCustomVariableStorage(true);
