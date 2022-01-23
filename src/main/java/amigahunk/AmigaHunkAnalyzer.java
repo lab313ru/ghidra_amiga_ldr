@@ -55,7 +55,7 @@ import ghidra.util.task.TaskMonitor;
 
 public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 
-	private static final int imageBaseOffset = 0x10000;
+	//private static final int imageBaseOffset = 0x10000;
 	
 	private final List<String> filter = new ArrayList<String>();
 	private FdFunctionsInLibs funcsList;

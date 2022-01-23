@@ -1,8 +1,6 @@
 package amigahunk;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -11,18 +9,19 @@ import java.util.Map;
 import generic.stl.Pair;
 import ghidra.app.util.bin.BinaryReader;
 import ghidra.app.util.bin.ByteProvider;
-import ghidra.app.util.bin.ByteProviderInputStream;
+import ghidra.app.util.bin.ByteProviderWrapper;
 import ghidra.formats.gfilesystem.FSRL;
 import ghidra.formats.gfilesystem.FSRLRoot;
-import ghidra.formats.gfilesystem.FSUtilities;
 import ghidra.formats.gfilesystem.FileSystemIndexHelper;
 import ghidra.formats.gfilesystem.FileSystemRefManager;
 import ghidra.formats.gfilesystem.FileSystemService;
 import ghidra.formats.gfilesystem.GFile;
 import ghidra.formats.gfilesystem.GFileSystem;
 import ghidra.formats.gfilesystem.annotations.FileSystemInfo;
-import ghidra.formats.gfilesystem.factory.GFileSystemFactoryFull;
-import ghidra.formats.gfilesystem.factory.GFileSystemProbeFull;
+import ghidra.formats.gfilesystem.factory.GFileSystemFactoryByteProvider;
+import ghidra.formats.gfilesystem.factory.GFileSystemProbeByteProvider;
+import ghidra.formats.gfilesystem.fileinfo.FileAttributeType;
+import ghidra.formats.gfilesystem.fileinfo.FileAttributes;
 import ghidra.util.exception.CancelledException;
 import ghidra.util.task.TaskMonitor;
 import hunk.HunkBlock;
@@ -239,14 +238,12 @@ public class AmigaHunkLibFileSystem implements GFileSystem {
 	}
 
 	@Override
-	public InputStream getInputStream(GFile file, TaskMonitor monitor)
+	public ByteProvider getByteProvider(GFile file, TaskMonitor monitor)
 			throws IOException, CancelledException {
 
-		// TODO: Get an input stream for a file.  The following is an example of how the metadata
-		// might be used to get an input stream from a stored provider offset.
 		LibHunkItem metadata = fsih.getMetadata(file);
 		return (metadata != null)
-				? new ByteProviderInputStream(provider, metadata.offset, metadata.size)
+				? new ByteProviderWrapper(provider, metadata.offset, metadata.size)
 				: null;
 	}
 
@@ -256,9 +253,15 @@ public class AmigaHunkLibFileSystem implements GFileSystem {
 	}
 
 	@Override
-	public String getInfo(GFile file, TaskMonitor monitor) {
+	public FileAttributes getFileAttributes(GFile file, TaskMonitor monitor) {
 		LibHunkItem metadata = fsih.getMetadata(file);
-		return (metadata == null) ? null : FSUtilities.infoMapToString(getInfoMap(metadata));
+		FileAttributes result = new FileAttributes();
+		if (metadata != null) {
+			result.add(FileAttributeType.NAME_ATTR, metadata.name);
+			result.add(FileAttributeType.UNKNOWN_ATTRIBUTE, "Offset", metadata.offset);
+			result.add(FileAttributeType.SIZE_ATTR, metadata.size);
+		}
+		return result;
 	}
 
 	public Map<String, String> getInfoMap(LibHunkItem metadata) {
@@ -269,14 +272,13 @@ public class AmigaHunkLibFileSystem implements GFileSystem {
 		return info;
 	}
 
-	// TODO: Customize for the real file system.
 	public static class AmigaHunkLibFileSystemFactory
-			implements GFileSystemFactoryFull<AmigaHunkLibFileSystem>, GFileSystemProbeFull {
+			implements GFileSystemFactoryByteProvider<AmigaHunkLibFileSystem>, GFileSystemProbeByteProvider {
 
 		@Override
-		public AmigaHunkLibFileSystem create(FSRL containerFSRL, FSRLRoot targetFSRL,
-				ByteProvider byteProvider, File containerFile, FileSystemService fsService,
-				TaskMonitor monitor) throws IOException, CancelledException {
+		public AmigaHunkLibFileSystem create(FSRLRoot targetFSRL,
+				ByteProvider byteProvider, FileSystemService fsService, TaskMonitor monitor)
+						throws IOException, CancelledException {
 
 			AmigaHunkLibFileSystem fs = new AmigaHunkLibFileSystem(targetFSRL, byteProvider);
 			fs.mount(monitor);
@@ -284,9 +286,8 @@ public class AmigaHunkLibFileSystem implements GFileSystem {
 		}
 
 		@Override
-		public boolean probe(FSRL containerFSRL, ByteProvider byteProvider, File containerFile,
-				FileSystemService fsService, TaskMonitor monitor)
-				throws IOException, CancelledException {
+		public boolean probe(ByteProvider byteProvider, FileSystemService fsService,
+				TaskMonitor monitor) throws IOException, CancelledException {
 			
 			if (!HunkBlockFile.isHunkBlockFile(new BinaryReader(byteProvider, false))) {
 				return false;
