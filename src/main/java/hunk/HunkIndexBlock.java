@@ -21,12 +21,6 @@ public class HunkIndexBlock extends HunkBlock {
 		calcHunkSize(reader);
 	}
 	
-	private static String getStringFromOffset(byte[] array, int offset) {
-		int i;
-		for (i = offset; i < array.length && array[i] != 0; i++) { }
-		return new String(array, offset, i - offset);
-	}
-
 	@Override
 	void parse(BinaryReader reader, boolean isExecutable) throws HunkParseError {
 		try {
