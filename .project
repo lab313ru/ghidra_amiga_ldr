@@ -14,11 +14,4 @@
 	<natures>
 		<nature>org.eclipse.jdt.core.javanature</nature>
 	</natures>
-	<linkedResources>
-		<link>
-			<name>Ghidra</name>
-			<type>2</type>
-			<location>D:/Ghidra/ghidra_10.1.1_PUBLIC</location>
-		</link>
-	</linkedResources>
 </projectDescription>

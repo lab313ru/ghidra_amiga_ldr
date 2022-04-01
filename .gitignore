@@ -1,8 +1,11 @@
+/.idea/
+/.idea_modules/
 /.gradle/
 /.settings/
 /bin/
 /build/
 /dist/
+/out/
 /samples/
 *.class
 .antProperties.xml
