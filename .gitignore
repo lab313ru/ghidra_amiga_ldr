@@ -6,5 +6,5 @@
 /samples/
 *.class
 .antProperties.xml
-.classpath
-.project
+/.classpath
+/.project
