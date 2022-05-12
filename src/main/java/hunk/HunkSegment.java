@@ -10,17 +10,18 @@ import ghidra.app.util.bin.ByteProvider;
 public class HunkSegment {
 
 	private HunkSegmentBlock segBlock;
-	private HunkSymbolBlock symBlock;
+//	private HunkSymbolBlock symBlock;
 	private List<HunkDebugBlock> dbgBlocks;
 	private List<DebugInfo> dbgInfos;
 	private List<HunkRelocBlock> relocBlocks;
+	private List<HunkSymbolBlock> symbolBlocks;
 	private HunkExtBlock extBlock;
 	
 	private String name;
 	
 	HunkSegment() {
 		segBlock = null;
-		symBlock = null;
+//		symBlock = null;
 		dbgBlocks = null;
 		dbgInfos = null;
 		relocBlocks = null;
@@ -50,6 +51,10 @@ public class HunkSegment {
 	HunkRelocBlock[] getRelocBlocks() {
 		return (relocBlocks == null) ? null : relocBlocks.toArray(HunkRelocBlock[]::new);
 	}
+
+	HunkSymbolBlock[] getSymbolBlocks() {
+		return (symbolBlocks == null) ? null : symbolBlocks.toArray(HunkSymbolBlock[]::new);
+	}
 	
 	String getName() {
 		return name;
@@ -70,11 +75,11 @@ public class HunkSegment {
 			} else if (block.getHunkType() == HunkType.HUNK_NAME) {
 				name = ((HunkNameBlock)block).getName();
 			} else if (block.getHunkType() == HunkType.HUNK_SYMBOL) {
-				if (symBlock == null) {
-					symBlock = (HunkSymbolBlock)block;
-				} else {
-					throw new HunkParseError("Duplicate symbols in hunk");
+				if (symbolBlocks == null) {
+					symbolBlocks = new ArrayList<>();
 				}
+				
+				symbolBlocks.add((HunkSymbolBlock)block);
 			} else if (block.getHunkType() == HunkType.HUNK_DEBUG) {
 				if (dbgBlocks == null) {
 					dbgBlocks = new ArrayList<>();

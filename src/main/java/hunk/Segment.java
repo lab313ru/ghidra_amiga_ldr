@@ -11,16 +11,20 @@ public class Segment {
 	private final int segSize;
 	private final byte[] data;
 	private final HashMap<Segment, List<Reloc>> relocsList;
+	private final HashMap<Segment, List<Symbol>> symbolsList;
 	private int id;
+	private int num;
 	private HunkSegment segmentInfo;
 	
-	Segment(SegmentType type, int size, byte[] data) {
+	Segment(SegmentType type, int size, byte[] data, int num) {
 		this.type = type;
 		this.segSize = size;
 		this.data = data;
+		this.num = num;
 		segmentInfo = null;
 		
 		relocsList = new HashMap<>();
+		symbolsList = new HashMap<>();
 		
 		id = -1;
 	}
@@ -57,8 +61,20 @@ public class Segment {
 		this.id = id;
 	}
 	
+	public int getNum() {
+		return num;
+	}
+	
+	public void setNum(int num) {
+		this.num = num;
+	}
+	
 	void addRelocations(Segment segment, final List<Reloc> relocs) {
 		relocsList.put(segment, relocs);
+	}
+	
+	void addSymbols(Segment segment, final List<Symbol> symbols) {
+		symbolsList.put(segment, symbols);
 	}
 	
 	public Segment[] getRelocationsToSegments() {
@@ -70,4 +86,11 @@ public class Segment {
 		
 		return relocs.toArray(Reloc[]::new);
 	}
+
+	public Symbol[] getSymbols(Segment toSeg) {
+		final List<Symbol> symbols = symbolsList.getOrDefault(toSeg, new ArrayList<>());
+		
+		return symbols.toArray(Symbol[]::new);
+	}
+
 }
