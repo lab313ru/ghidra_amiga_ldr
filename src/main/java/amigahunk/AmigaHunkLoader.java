@@ -221,16 +221,6 @@ public class AmigaHunkLoader extends AbstractLibrarySupportLoader {
 		
 		addSymbols(bi.getSegments(), fpa.getCurrentProgram().getSymbolTable(), addrs, fpa);
 		
-//		SymbolTable st = fpa.getCurrentProgram().getSymbolTable();
-//		
-//		for (Segment seg : bi.getSegments()) {
-//			hunk.Symbol[] symbols = seg.getSymbols(seg);
-//			for(hunk.Symbol symbol : symbols) {
-//				String name = symbol.getName();
-//				int offset = symbol.getOffset();
-//				st.createLabel(fpa.toAddr(addrs[seg.getId()]+offset), name, SourceType.IMPORTED);
-//			}
-//		}
 	}
 	
 	private static void addSymbols(Segment segs[], SymbolTable st, int addrs[], FlatProgramAPI fpa) throws Throwable {
