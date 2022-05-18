@@ -1,8 +1,10 @@
 package hunk;
 
 import java.io.IOException;
-
-import com.google.common.primitives.Bytes;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
 
 import ghidra.app.util.bin.BinaryReader;
 
@@ -34,10 +36,32 @@ public abstract class HunkBlock {
 			return null;
 		}
 		
-		int zeroIdx = Bytes.indexOf(bytes, (byte) 0);
+		return getStringFromOffset(bytes, 0);
+	}
+	
+	protected static String getStringFromOffset(byte[] array, int offset) {
+		if (offset < 0) {
+			return null;
+		}
 		
-		String name = new String(bytes);
-		return (zeroIdx == -1) ? name : name.substring(0, zeroIdx);
+		int indexEnd = offset;
+		while (indexEnd < array.length && array[indexEnd] != 0) {
+			++indexEnd;
+		}
+		int length = indexEnd - offset;
+		if (length > 0) {
+			try {
+				return StandardCharsets.ISO_8859_1.newDecoder()
+						.onMalformedInput(CodingErrorAction.REPLACE)
+						.onUnmappableCharacter(CodingErrorAction.REPLACE)
+						.replaceWith("?")
+						.decode(ByteBuffer.wrap(array, offset, length)).toString();
+			} catch (CharacterCodingException e) {
+				// this should never happen due to CodingErrorAction.REPLACE
+				return "?".repeat(length);
+			}
+		}
+		return new String();
 	}
 	
 	public HunkType getHunkType() {
