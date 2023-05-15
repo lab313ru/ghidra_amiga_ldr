@@ -215,7 +215,7 @@ public class AmigaHunkAnalyzer extends AbstractAnalyzer {
 			throws CancelledException {
 
 		ConstantPropagationContextEvaluator eval =
-			new ConstantPropagationContextEvaluator(true) {
+			new ConstantPropagationContextEvaluator(monitor, true) {
 				@Override
 				public boolean evaluateContext(VarnodeContext context, Instruction instr) {
 					String mnemonic = instr.getMnemonicString();
