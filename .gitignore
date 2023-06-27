@@ -5,6 +5,3 @@
 /dist/
 /samples/
 *.class
-.antProperties.xml
-/.classpath
-/.project
